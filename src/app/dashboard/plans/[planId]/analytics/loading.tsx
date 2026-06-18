@@ -1,0 +1,17 @@
+import Skeleton from "@/components/skeleton";
+
+export default function Loading() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-48" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-[300px] col-span-1 lg:col-span-2 rounded-xl" />
+        <Skeleton className="h-[300px] rounded-xl" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-[300px] rounded-xl" />
+        <Skeleton className="h-[300px] rounded-xl" />
+      </div>
+    </div>
+  );
+}

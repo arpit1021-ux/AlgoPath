@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+  url      = env("DATABASE_URL")
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────
+
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  EXPERT
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum DifficultyPreference {
+  VERY_EASY
+  EASY
+  MEDIUM
+  HARD
+  VERY_HARD
+}
+
+enum PlanStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProblemStatus {
+  TODO
+  ATTEMPTED
+  SOLVED
+  SKIPPED
+}
+
+enum RevisionStatus {
+  PENDING
+  COMPLETED
+  MISSED
+  SKIPPED
+}
+
+// ─── Models ───────────────────────────────────────────
+
+model User {
+  id              String          @id @default(cuid())
+  clerkId         String          @unique
+  email           String?
+  name            String?
+  username        String?         @unique
+  image           String?
+  experienceLevel ExperienceLevel @default(BEGINNER)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  plans        Plan[]
+  notes        Note[]
+  revisions    Revision[]
+  activityLogs ActivityLog[]
+  badges       UserBadge[]
+
+  @@map("users")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+
+  problems CompanyProblemFrequency[]
+  plans    PlanCompany[]
+
+  @@map("companies")
+}
+
+model Problem {
+  id             String     @id @default(cuid())
+  leetcodeId     Int        @unique
+  title          String
+  titleSlug      String     @unique
+  difficulty     Difficulty
+  acceptanceRate Float
+  likes          Int        @default(0)
+  dislikes       Int        @default(0)
+  isPremium      Boolean    @default(false)
+  url            String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  tags         Tag[]
+  companies    CompanyProblemFrequency[]
+  planProblems PlanProblem[]
+
+  @@map("problems")
+}
+
+model Tag {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  problems Problem[]
+  plans    PlanTag[]
+
+  @@map("tags")
+}
+
+model CompanyProblemFrequency {
+  id          String    @id @default(cuid())
+  companyId   String
+  problemId   String
+  frequency   Int       @default(1)
+  lastAskedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, problemId])
+  @@map("company_problem_frequencies")
+}
+
+model Plan {
+  id                   String               @id @default(cuid())
+  userId               String
+  name                 String
+  description          String?
+  experienceLevel      ExperienceLevel
+  timelineWeeks        Int
+  weeklyHours          Float
+  difficultyPreference DifficultyPreference
+  status               PlanStatus           @default(ACTIVE)
+  startDate            DateTime             @default(now())
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetCompanies PlanCompany[]
+  selectedTags    PlanTag[]
+  problems        PlanProblem[]
+  activityLogs    ActivityLog[]
+
+  @@map("plans")
+}
+
+model PlanCompany {
+  planId    String
+  companyId String
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([planId, companyId])
+  @@map("plan_companies")
+}
+
+model PlanTag {
+  planId String
+  tagId  String
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([planId, tagId])
+  @@map("plan_tags")
+}
+
+model PlanProblem {
+  id               String        @id @default(cuid())
+  planId           String
+  problemId        String
+  weekNumber       Int
+  order            Int           @default(0)
+  status           ProblemStatus @default(TODO)
+  assignedDate     DateTime?
+  completedAt      DateTime?
+  timeSpentMinutes Int           @default(0)
+
+  plan      Plan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  problem   Problem    @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  revisions Revision[]
+  notes     Note[]
+
+  @@unique([planId, problemId])
+  @@map("plan_problems")
+}
+
+model Revision {
+  id             String         @id @default(cuid())
+  planProblemId  String
+  userId         String
+  revisionNumber Int
+  scheduledDate  DateTime
+  completedDate  DateTime?
+  status         RevisionStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  planProblem PlanProblem @relation(fields: [planProblemId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("revisions")
+}
+
+model Note {
+  id            String   @id @default(cuid())
+  planProblemId String
+  userId        String
+  content       String
+  isAiGenerated Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  planProblem PlanProblem @relation(fields: [planProblemId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([planProblemId, userId])
+  @@map("notes")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  planId    String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeType String
+  earnedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeType])
+  @@map("user_badges")
+}
