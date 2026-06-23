@@ -18,38 +18,62 @@ let seedPromise: Promise<void> | null = null;
 
 async function ensureProblemsSeeded() {
   const count = await db.problem.count();
-  if (count > 0) return;
+  if (count >= 700) return;
   if (seedPromise) return seedPromise;
 
   seedPromise = (async () => {
     const problems = getAllProblems();
-    console.log(`Seeding ${problems.length} problems...`);
+    console.log(`Seeding ${problems.length} problems (had ${count})...`);
 
+    // Clear old data for clean re-seed
+    await db.companyProblemFrequency.deleteMany();
+    await db.planProblem.deleteMany();
+    await db.problem.deleteMany();
+    await db.tag.deleteMany();
+    await db.company.deleteMany();
+
+    // Batch upsert all tags
+    const allTagNames = new Set<string>();
     for (const p of problems) {
-      // Upsert tags
-      for (const tagName of p.tags) {
-        await db.tag.upsert({
-          where: { slug: slugify(tagName) },
+      for (const t of p.tags) allTagNames.add(t);
+    }
+    const tagRecords = await Promise.all(
+      [...allTagNames].map(async (name) => {
+        const slug = slugify(name);
+        return db.tag.upsert({
+          where: { slug },
           update: {},
-          create: { name: tagName, slug: slugify(tagName) },
+          create: { name, slug },
         });
-      }
-      // Upsert companies
-      for (const companyName of p.companies) {
-        await db.company.upsert({
-          where: { slug: slugify(companyName) },
-          update: {},
-          create: {
-            name: companyName,
-            slug: slugify(companyName),
-          },
-        });
-      }
+      })
+    );
+    const tagMap = new Map(tagRecords.map((t) => [t.name, t.id]));
+    console.log(`Upserted ${tagRecords.length} tags.`);
 
-      const created = await db.problem.upsert({
-        where: { titleSlug: p.titleSlug },
-        update: {},
-        create: {
+    // Batch upsert all companies
+    const allCompanyNames = new Set<string>();
+    for (const p of problems) {
+      for (const c of p.companies) allCompanyNames.add(c);
+    }
+    const companyRecords = await Promise.all(
+      [...allCompanyNames].map(async (name) => {
+        const slug = slugify(name);
+        return db.company.upsert({
+          where: { slug },
+          update: {},
+          create: { name, slug },
+        });
+      })
+    );
+    const companyMap = new Map(companyRecords.map((c) => [c.name, c.id]));
+    console.log(`Upserted ${companyRecords.length} companies.`);
+
+    // Batch create all problems
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < problems.length; i += BATCH_SIZE) {
+      const batch = problems.slice(i, i + BATCH_SIZE);
+      await db.problem.createMany({
+        data: batch.map((p) => ({
           leetcodeId: p.id,
           title: p.title,
           titleSlug: p.titleSlug,
@@ -59,36 +83,57 @@ async function ensureProblemsSeeded() {
           dislikes: p.dislikes,
           isPremium: p.isPremium,
           url: getLeetCodeUrl(p.titleSlug),
-        },
+        })),
+        skipDuplicates: true,
       });
+    }
+    console.log(`Created ${problems.length} problems.`);
 
-      for (const tagName of p.tags) {
-        const tag = await db.tag.findUnique({ where: { slug: slugify(tagName) } });
-        if (tag) {
-          await db.problem.update({
-            where: { id: created.id },
-            data: { tags: { connect: { id: tag.id } } },
-          }).catch(() => {}); // already connected — ignore
-        }
-      }
+    // Fetch all created problems to get their IDs
+    const createdProblems = await db.problem.findMany({
+      select: { id: true, titleSlug: true },
+    });
+    const problemIdMap = new Map(createdProblems.map((p) => [p.titleSlug, p.id]));
 
-      for (const companyName of p.companies) {
-        const company = await db.company.findUnique({
-          where: { slug: slugify(companyName) },
-        });
-        if (company) {
-          await db.companyProblemFrequency.upsert({
-            where: { companyId_problemId: { companyId: company.id, problemId: created.id } },
-            update: {},
-            create: {
-              companyId: company.id,
-              problemId: created.id,
-              frequency: Math.floor(Math.random() * 10) + 1,
-            },
-          });
-        }
+    // Batch create tag connections
+    const tagConnections: { problemId: string; tagId: string }[] = [];
+    for (const p of problems) {
+      const pid = problemIdMap.get(p.titleSlug);
+      if (!pid) continue;
+      for (const t of p.tags) {
+        const tid = tagMap.get(t);
+        if (tid) tagConnections.push({ problemId: pid, tagId: tid });
       }
     }
+    for (let i = 0; i < tagConnections.length; i += BATCH_SIZE) {
+      const batch = tagConnections.slice(i, i + BATCH_SIZE);
+      await Promise.all(
+        batch.map((tc) =>
+          db.problem.update({
+            where: { id: tc.problemId },
+            data: { tags: { connect: { id: tc.tagId } } },
+          }).catch(() => {})
+        )
+      );
+    }
+    console.log(`Connected ${tagConnections.length} tag-problem links.`);
+
+    // Batch create company-problem-frequency records
+    const freqData: { companyId: string; problemId: string; frequency: number }[] = [];
+    for (const p of problems) {
+      const pid = problemIdMap.get(p.titleSlug);
+      if (!pid) continue;
+      for (const c of p.companies) {
+        const cid = companyMap.get(c);
+        if (cid) freqData.push({ companyId: cid, problemId: pid, frequency: Math.floor(Math.random() * 10) + 1 });
+      }
+    }
+    for (let i = 0; i < freqData.length; i += BATCH_SIZE) {
+      const batch = freqData.slice(i, i + BATCH_SIZE);
+      await db.companyProblemFrequency.createMany({ data: batch, skipDuplicates: true });
+    }
+    console.log(`Connected ${freqData.length} company-problem links.`);
+
     console.log("Seeding complete.");
   })();
 

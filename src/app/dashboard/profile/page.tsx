@@ -1,6 +1,6 @@
-"use client";
-
-import { useUser } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/lib/db";
 import {
   Card,
   CardContent,
@@ -8,21 +8,128 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { User, Trophy, Target, Flame, Rocket } from "lucide-react";
+import { User, Trophy, Target, Flame, CheckCircle2, RotateCcw, Lock } from "lucide-react";
+import { ProgressBar } from "@/components/ui-custom";
+import { cn } from "@/lib/utils";
 
-export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
+export default async function ProfilePage() {
+  const clerkUser = await currentUser();
+  const { userId: clerkId } = await auth();
 
-  if (!isLoaded) {
+  if (!clerkId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading profile...</div>
+        <div className="text-muted-foreground">Not authenticated</div>
       </div>
     );
   }
+
+  const user = await db.user.findUnique({ where: { clerkId } });
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">User not found</div>
+      </div>
+    );
+  }
+
+  const [totalSolved, totalRevisions, recentActivity, allPlans] = await Promise.all([
+    db.planProblem.count({
+      where: { plan: { userId: user.id }, status: "SOLVED" },
+    }),
+    db.revision.count({
+      where: { userId: user.id, status: "COMPLETED" },
+    }),
+    db.activityLog.findMany({
+      where: { userId: user.id },
+      select: { createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    db.plan.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        problems: {
+          select: { id: true, status: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  // Calculate streak
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const activityDates = new Set(
+    recentActivity.map((a) => {
+      const d = new Date(a.createdAt);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    })
+  );
+
+  let checkDate = new Date(today);
+  while (true) {
+    if (activityDates.has(checkDate.getTime())) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  const activePlans = allPlans.filter((p) => p.status === "ACTIVE").length;
+
+  // Badge definitions
+  const badges = [
+    {
+      name: "First Blood",
+      description: "Solve your first problem",
+      earned: totalSolved >= 1,
+      icon: "🎯",
+    },
+    {
+      name: "Week Warrior",
+      description: "Solve 7 problems",
+      earned: totalSolved >= 7,
+      icon: "⚔️",
+    },
+    {
+      name: "Consistency King",
+      description: "3+ day streak",
+      earned: streak >= 3,
+      icon: "🔥",
+    },
+    {
+      name: "Halfway There",
+      description: "Reach 50% in any plan",
+      earned: allPlans.some((p) => {
+        const total = p.problems.length;
+        const solved = p.problems.filter((pp) => pp.status === "SOLVED").length;
+        return total > 0 && (solved / total) * 100 >= 50;
+      }),
+      icon: "🏆",
+    },
+    {
+      name: "Revision Master",
+      description: "Complete 10 revisions",
+      earned: totalRevisions >= 10,
+      icon: "🔄",
+    },
+    {
+      name: "Century Club",
+      description: "Solve 100 problems",
+      earned: totalSolved >= 100,
+      icon: "💯",
+    },
+  ];
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -40,9 +147,9 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
-            {user?.imageUrl ? (
+            {clerkUser?.imageUrl ? (
               <img
-                src={user.imageUrl}
+                src={clerkUser.imageUrl}
                 alt="Avatar"
                 className="h-16 w-16 rounded-xl object-cover ring-2 ring-border"
               />
@@ -53,21 +160,18 @@ export default function ProfilePage() {
             )}
             <div>
               <p className="font-semibold text-lg">
-                {user?.fullName || "User"}
+                {clerkUser?.firstName || "User"}
               </p>
               <p className="text-sm text-muted-foreground">
-                {user?.primaryEmailAddress?.emailAddress || "No email"}
+                {clerkUser?.emailAddresses?.[0]?.emailAddress || "No email"}
               </p>
-              <Badge variant="secondary" className="mt-1 text-xs">
-                {user?.id?.slice(0, 10)}...
-              </Badge>
             </div>
           </div>
           <div className="grid gap-4">
             <div>
               <label className="text-sm font-medium">Name</label>
               <Input
-                defaultValue={user?.fullName || ""}
+                defaultValue={clerkUser?.fullName || ""}
                 className="mt-1"
                 disabled
               />
@@ -75,17 +179,7 @@ export default function ProfilePage() {
             <div>
               <label className="text-sm font-medium">Email</label>
               <Input
-                defaultValue={
-                  user?.primaryEmailAddress?.emailAddress || ""
-                }
-                className="mt-1"
-                disabled
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Username</label>
-              <Input
-                defaultValue={user?.username || ""}
+                defaultValue={clerkUser?.emailAddresses?.[0]?.emailAddress || ""}
                 className="mt-1"
                 disabled
               />
@@ -101,52 +195,91 @@ export default function ProfilePage() {
       <Card className="glass-card border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Stats
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="p-4 rounded-xl bg-muted/30">
+              <div className="text-2xl font-bold gradient-text">{totalSolved}</div>
+              <p className="text-xs text-muted-foreground mt-1">Problems Solved</p>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/30">
+              <div className="text-2xl font-bold gradient-text">{totalRevisions}</div>
+              <p className="text-xs text-muted-foreground mt-1">Revisions Done</p>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/30">
+              <div className="text-2xl font-bold gradient-text flex items-center justify-center gap-1">
+                {streak}
+                <Flame className="h-4 w-4" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Day Streak</p>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/30">
+              <div className="text-2xl font-bold gradient-text">{activePlans}</div>
+              <p className="text-xs text-muted-foreground mt-1">Active Plans</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plans list */}
+      {allPlans.length > 0 && (
+        <Card className="glass-card border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              Plans
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {allPlans.map((plan) => {
+              const total = plan.problems.length;
+              const solved = plan.problems.filter((p) => p.status === "SOLVED").length;
+              const pct = total > 0 ? Math.round((solved / total) * 100) : 0;
+              return (
+                <div key={plan.id} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{plan.name}</span>
+                    <span className="text-xs text-muted-foreground">{solved}/{total} · {pct}%</span>
+                  </div>
+                  <ProgressBar value={pct} />
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="glass-card border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5" />
             Achievements
           </CardTitle>
           <CardDescription>Your earned badges</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
-              <Trophy className="h-8 w-8 opacity-50" />
-            </div>
-            <p className="font-medium">No badges earned yet</p>
-            <p className="text-sm mt-1">
-              Solve problems and complete revisions to earn badges
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="glass-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Stats
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="p-4 rounded-xl bg-muted/30">
-              <div className="text-2xl font-bold gradient-text">0</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Problems Solved
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-muted/30">
-              <div className="text-2xl font-bold gradient-text">0</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Revisions Done
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-muted/30">
-              <div className="text-2xl font-bold gradient-text flex items-center justify-center gap-1">
-                0
-                <Flame className="h-4 w-4" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {badges.map((badge) => (
+              <div
+                key={badge.name}
+                className={cn(
+                  "flex flex-col items-center p-4 rounded-xl border text-center transition-colors",
+                  badge.earned
+                    ? "bg-primary/5 border-primary/20"
+                    : "bg-muted/20 border-border/50 opacity-50"
+                )}
+              >
+                <div className="text-3xl mb-2">{badge.icon}</div>
+                <p className="text-sm font-semibold">{badge.name}</p>
+                <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
+                {!badge.earned && (
+                  <Lock className="h-3 w-3 text-muted-foreground mt-2" />
+                )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Day Streak</p>
-            </div>
+            ))}
           </div>
         </CardContent>
       </Card>

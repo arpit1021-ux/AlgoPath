@@ -1,16 +1,10 @@
-import Skeleton from "@/components/skeleton";
-
 export default function Loading() {
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <Skeleton className="h-9 w-28 rounded-lg" />
-      </div>
-      <Skeleton className="h-[200px] w-full rounded-xl" />
+    <div className="space-y-4 p-6 animate-pulse">
+      <div className="h-8 w-48 rounded-lg bg-white/5" />
+      <div className="h-32 rounded-xl bg-white/5" />
+      <div className="h-32 rounded-xl bg-white/5" />
+      <div className="h-32 rounded-xl bg-white/5" />
     </div>
   );
 }

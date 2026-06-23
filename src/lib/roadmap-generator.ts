@@ -1,5 +1,5 @@
 import { db } from "./db";
-import type { PlanWizardInput, ExperienceLevel } from "./types";
+import type { PlanWizardInput, ExperienceLevel, DifficultyPreference } from "./types";
 
 interface RoadmapProblem {
   problemId: string;
@@ -32,51 +32,19 @@ const ESTIMATED_TIME: Record<string, Record<string, number>> = {
   EXPERT:       { EASY: 15, MEDIUM: 28, HARD: 45 },
 };
 
-const DIFFICULTY_DISTRIBUTION: Record<
-  ExperienceLevel,
-  { EASY: number; MEDIUM: number; HARD: number }
-> = {
-  BEGINNER: {
-    EASY: 0.5,
-    MEDIUM: 0.35,
-    HARD: 0.15,
-  },
-  INTERMEDIATE: {
-    EASY: 0.25,
-    MEDIUM: 0.45,
-    HARD: 0.3,
-  },
-  EXPERT: {
-    EASY: 0.1,
-    MEDIUM: 0.3,
-    HARD: 0.6,
-  },
+// Target difficulty distribution per difficulty preference
+const TARGET_DISTRIBUTION: Record<DifficultyPreference, { EASY: number; MEDIUM: number; HARD: number }> = {
+  VERY_EASY: { EASY: 0.65, MEDIUM: 0.30, HARD: 0.05 },
+  EASY:      { EASY: 0.50, MEDIUM: 0.40, HARD: 0.10 },
+  MEDIUM:    { EASY: 0.20, MEDIUM: 0.55, HARD: 0.25 },
+  HARD:      { EASY: 0.10, MEDIUM: 0.30, HARD: 0.60 },
+  VERY_HARD: { EASY: 0.05, MEDIUM: 0.20, HARD: 0.75 },
 };
 
-function getDifficultyForWeek(
-  weekNumber: number,
-  totalWeeks: number,
-  experienceLevel: ExperienceLevel
+function getDifficultyDistribution(
+  difficultyPreference: DifficultyPreference
 ): { EASY: number; MEDIUM: number; HARD: number } {
-  const progress = weekNumber / totalWeeks;
-  const base = DIFFICULTY_DISTRIBUTION[experienceLevel];
-
-  if (progress <= 0.25) {
-    return {
-      EASY:   Math.min(1, base.EASY + 0.15),
-      MEDIUM: Math.max(0, base.MEDIUM - 0.1),
-      HARD:   Math.max(0, base.HARD - 0.05),
-    };
-  }
-  if (progress <= 0.6) {
-    return base;
-  }
-  // Ramp up hard in final weeks
-  return {
-    EASY:   Math.max(0.05, base.EASY - 0.1),
-    MEDIUM: base.MEDIUM,
-    HARD:   Math.min(0.9,  base.HARD + 0.1),
-  };
+  return TARGET_DISTRIBUTION[difficultyPreference] ?? TARGET_DISTRIBUTION.MEDIUM;
 }
 
 function balanceTopics<T extends { tags: string[] }>(
@@ -122,9 +90,9 @@ export async function generateRoadmap(
   input: PlanWizardInput
 ): Promise<Roadmap> {
   const totalWeeks = input.timelineWeeks;
-  // FIX: weeklyMinutes correctly derived from input
   const weeklyMinutes = input.weeklyHours * 60;
   const expLevel = input.experienceLevel as ExperienceLevel;
+  const diffPref = (input.difficultyPreference || "MEDIUM") as DifficultyPreference;
   const timeMap = ESTIMATED_TIME[expLevel] ?? ESTIMATED_TIME["INTERMEDIATE"];
 
   const topicFilter =
@@ -152,15 +120,46 @@ export async function generateRoadmap(
     },
   });
 
-  // Get company-prioritized problem IDs
-  let companyProblemIds = new Set<string>();
+  // Get company-prioritized problem IDs with ordered priority
+  // First selected company gets highest score, second gets less, etc.
+  const companyProblemScores = new Map<string, number>();
   if (input.targetCompanies.length > 0) {
     const companyRows = await db.companyProblemFrequency.findMany({
       where: { company: { slug: { in: input.targetCompanies } } },
-      select: { problemId: true, frequency: true },
+      select: { problemId: true, companyId: true, frequency: true },
       orderBy: { frequency: "desc" },
     });
-    companyProblemIds = new Set(companyRows.map((r) => r.problemId));
+
+    for (const row of companyRows) {
+      const companyIdx = input.targetCompanies.indexOf(
+        // Need to look up slug from companyId — but we can use the set approach
+        // Actually we have the companyId, need to map back
+        row.companyId
+      );
+      // Since companyRows don't have slug, we'll do a second pass
+    }
+
+    // Build a map: companyId → priority index (0 = highest)
+    const companySlugToPriority = new Map<string, number>();
+    input.targetCompanies.forEach((slug, idx) => {
+      companySlugToPriority.set(slug, idx);
+    });
+
+    // Fetch company slugs for the frequency records
+    const companyIds = [...new Set(companyRows.map((r) => r.companyId))];
+    const companySlugRows = await db.company.findMany({
+      where: { id: { in: companyIds } },
+      select: { id: true, slug: true },
+    });
+    const companyIdToSlug = new Map(companySlugRows.map((c) => [c.id, c.slug]));
+
+    for (const row of companyRows) {
+      const slug = companyIdToSlug.get(row.companyId);
+      const priority = slug ? companySlugToPriority.get(slug) ?? 99 : 99;
+      const baseScore = 100 - priority * 15; // 1st=100, 2nd=85, 3rd=70, etc.
+      const existing = companyProblemScores.get(row.problemId) ?? 0;
+      companyProblemScores.set(row.problemId, Math.max(existing, baseScore));
+    }
   }
 
   // Score and sort problems
@@ -169,7 +168,7 @@ export async function generateRoadmap(
       ...p,
       tags: p.tags.map((t) => t.name),
       score:
-        (companyProblemIds.has(p.id) ? 100 : 0) +
+        (companyProblemScores.get(p.id) ?? 0) +
         p.likes * 0.01 +
         (100 - p.acceptanceRate) * 0.1,
     }))
@@ -190,7 +189,7 @@ export async function generateRoadmap(
   };
 
   for (let week = 1; week <= totalWeeks; week++) {
-    const dist = getDifficultyForWeek(week, totalWeeks, expLevel);
+    const dist = getDifficultyDistribution(diffPref);
     const weekProblems: RoadmapProblem[] = [];
     let remainingMinutes = weeklyMinutes;
 
@@ -233,6 +232,8 @@ export async function generateRoadmap(
       }
     }
 
+    const diffOrder: Record<string, number> = { EASY: 0, MEDIUM: 1, HARD: 2 };
+    weekProblems.sort((a, b) => (diffOrder[a.difficulty] ?? 1) - (diffOrder[b.difficulty] ?? 1));
     const balanced = balanceTopics(weekProblems);
     balanced.forEach((p, i) => { p.order = i + 1; });
 

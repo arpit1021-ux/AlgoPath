@@ -2,14 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
-  Sparkles, Rocket, Trash2, BarChart3, RotateCcw,
-  ChevronRight, Clock, Target,
+  Sparkles,
+  Rocket,
+  Trash2,
+  BarChart3,
+  RotateCcw,
+  ChevronRight,
+  Clock,
+  Target,
 } from "lucide-react";
+import { ProgressBar, SkeletonCard } from "@/components/ui-custom";
+import { cn } from "@/lib/utils";
 
 interface Plan {
   id: string;
@@ -25,10 +29,19 @@ interface Plan {
   problems: Array<{ id: string; status: string }>;
 }
 
+const statusColors: Record<string, string> = {
+  ACTIVE: "bg-[rgba(52,211,153,0.08)] text-[#34d399] border-[rgba(52,211,153,0.15)]",
+  PAUSED: "bg-[rgba(251,191,36,0.08)] text-[#fbbf24] border-[rgba(251,191,36,0.15)]",
+  ARCHIVED: "bg-white/[0.04] text-[#8b8d9e] border-white/[0.06]",
+};
+
 export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"newest" | "progress" | "name">("newest");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
   useEffect(() => {
     fetch("/api/plans")
@@ -38,8 +51,26 @@ export default function PlansPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const deletePlan = async (planId: string, planName: string) => {
-    if (!confirm(`Delete "${planName}"? This cannot be undone.`)) return;
+  const filteredPlans = plans
+    .filter((p) => statusFilter === "ALL" || p.status === statusFilter)
+    .sort((a, b) => {
+      if (sortBy === "progress") {
+        const aPct = a.problems.length > 0 ? a.problems.filter((p) => p.status === "SOLVED").length / a.problems.length : 0;
+        const bPct = b.problems.length > 0 ? b.problems.filter((p) => p.status === "SOLVED").length / b.problems.length : 0;
+        return bPct - aPct;
+      }
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+  const statusCounts = {
+    ALL: plans.length,
+    ACTIVE: plans.filter((p) => p.status === "ACTIVE").length,
+    PAUSED: plans.filter((p) => p.status === "PAUSED").length,
+    COMPLETED: plans.filter((p) => p.status === "COMPLETED").length,
+  };
+
+  const deletePlan = async (planId: string) => {
     setDeletingId(planId);
     try {
       await fetch(`/api/plans/${planId}`, { method: "DELETE" });
@@ -49,183 +80,249 @@ export default function PlansPage() {
       alert("Failed to delete plan.");
     } finally {
       setDeletingId(null);
+      setDeleteConfirm(null);
     }
   };
 
-  const difficultyColor = (d: string) => {
-    if (d === "EASY") return "text-green-500 border-green-500/30";
-    if (d === "MEDIUM") return "text-yellow-500 border-yellow-500/30";
-    if (d === "HARD") return "text-red-500 border-red-500/30";
-    return "text-muted-foreground";
-  };
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-white/[0.04] rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">My Plans</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold text-[#f0f0f5]">My Plans</h1>
+          <p className="text-sm text-[#8b8d9e] mt-1">
             Manage your interview preparation plans.
           </p>
         </div>
-        <Link href="/dashboard/plans/new">
-          <Button className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/20">
-            <Rocket className="h-4 w-4 mr-2" />
-            New Plan
-          </Button>
+        <Link
+          href="/dashboard/plans/new"
+          className="btn-primary flex items-center gap-2 text-sm self-start"
+        >
+          <Rocket className="w-4 h-4" />
+          New Plan
         </Link>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="text-center py-16 text-muted-foreground">
-          Loading plans...
+      {/* Filters & Sort */}
+      {plans.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex gap-1 p-1 bg-white/5 rounded-lg">
+            {(["ALL", "ACTIVE", "PAUSED", "COMPLETED"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                  statusFilter === status
+                    ? "bg-primary text-white"
+                    : "text-[#8b8d9e] hover:text-[#f0f0f5]"
+                )}
+              >
+                {status === "ALL" ? "All" : status.charAt(0) + status.slice(1).toLowerCase()}
+                <span className="ml-1.5 text-[10px] opacity-60">{statusCounts[status]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#8b8d9e]">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-[#f0f0f5] focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="newest">Newest</option>
+              <option value="progress">Progress</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && plans.length === 0 && (
-        <Card className="glass-card border-border/50">
-          <CardContent>
-            <div className="text-center py-16 text-muted-foreground">
-              <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-6">
-                <Sparkles className="h-10 w-10 opacity-50" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-foreground">
-                No plans yet
-              </h3>
-              <p className="mb-6 max-w-md mx-auto">
-                Create your first preparation plan to get a personalized roadmap
-                tailored to your target companies and timeline.
-              </p>
-              <Link href="/dashboard/plans/new">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/20"
-                >
-                  <Rocket className="h-4 w-4 mr-2" />
-                  Create Your First Plan
-                </Button>
-              </Link>
+      {/* Plans Grid */}
+      {plans.length === 0 ? (
+        <div className="card-surface py-20">
+          <div className="text-center">
+            <div className="w-20 h-20 rounded-full bg-[rgba(139,92,246,0.06)] flex items-center justify-center mx-auto mb-6">
+              <Sparkles className="w-10 h-10 text-[#8b5cf6]" />
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Plans grid */}
-      {!loading && plans.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {plans.map((plan) => {
-            const solved = plan.problems.filter((p) => p.status === "SOLVED").length;
+            <h3 className="text-xl font-semibold text-[#f0f0f5] mb-2">
+              No plans yet
+            </h3>
+            <p className="text-sm text-[#8b8d9e] max-w-sm mx-auto mb-6">
+              Create your first preparation plan to get a personalized roadmap
+              tailored to your target companies and timeline.
+            </p>
+            <Link
+              href="/dashboard/plans/new"
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              <Rocket className="w-4 h-4" />
+              Create Your First Plan
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {filteredPlans.map((plan) => {
+            const solved = plan.problems.filter(
+              (p) => p.status === "SOLVED"
+            ).length;
             const total = plan.problems.length;
-            const pct = total > 0 ? Math.round((solved / total) * 100) : 0;
-            const isDeleting = deletingId === plan.id;
+            const pct =
+              total > 0 ? Math.round((solved / total) * 100) : 0;
 
             return (
               <div
                 key={plan.id}
-                className="relative group rounded-xl border bg-card hover:shadow-md transition-all duration-200"
+                className="card-surface-hover p-6 relative group"
               >
                 {/* Delete button */}
                 <button
-                  onClick={() => deletePlan(plan.id, plan.name)}
-                  disabled={isDeleting}
-                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 disabled:opacity-50"
-                  title="Delete plan"
+                  onClick={() => setDeleteConfirm(plan.id)}
+                  className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-[rgba(248,113,113,0.1)] text-[#4b4d5e] hover:text-[#f87171]"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
 
-                <div className="p-5">
-                  {/* Plan name + status */}
-                  <div className="flex items-start gap-2 mb-3 pr-8">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base leading-tight truncate">
-                        {plan.name}
-                      </h3>
-                      {plan.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                          {plan.description}
-                        </p>
-                      )}
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={
-                        plan.status === "ACTIVE"
-                          ? "text-emerald-500 border-emerald-500/30 shrink-0 text-xs"
-                          : "text-muted-foreground shrink-0 text-xs"
-                      }
+                {/* Title + Status */}
+                <div className="flex items-start justify-between mb-3 pr-8">
+                  <h3 className="font-semibold text-base text-[#f0f0f5] truncate">
+                    {plan.name}
+                  </h3>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-medium border ${statusColors[plan.status] || statusColors.ARCHIVED}`}
+                  >
+                    {plan.status}
+                  </span>
+                </div>
+
+                {/* Metadata */}
+                <div className="flex items-center gap-4 text-xs text-[#8b8d9e] mb-3">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {plan.timelineWeeks}w · {plan.weeklyHours}h/w
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Target className="w-3 h-3" />
+                    {plan.experienceLevel.toLowerCase()}
+                  </span>
+                </div>
+
+                {/* Company Chips */}
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {plan.targetCompanies.slice(0, 4).map((tc) => (
+                    <span
+                      key={tc.company.slug}
+                      className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[11px] text-[#8b8d9e]"
                     >
-                      {plan.status}
-                    </Badge>
-                  </div>
-
-                  {/* Meta info */}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {plan.timelineWeeks}w · {plan.weeklyHours}h/week
+                      {tc.company.name}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Target className="h-3 w-3" />
-                      {plan.experienceLevel.toLowerCase()}
+                  ))}
+                  {plan.targetCompanies.length > 4 && (
+                    <span className="px-2 py-0.5 rounded bg-white/[0.04] text-[11px] text-[#4b4d5e]">
+                      +{plan.targetCompanies.length - 4}
+                    </span>
+                  )}
+                </div>
+
+                {/* Progress */}
+                <div className="space-y-1.5 mb-5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#4b4d5e] font-medium">Progress</span>
+                    <span className="font-medium text-[#8b8d9e]">
+                      {solved}/{total} solved · {pct}%
                     </span>
                   </div>
+                  <ProgressBar value={pct} />
+                </div>
 
-                  {/* Companies */}
-                  <div className="flex flex-wrap gap-1 mb-4">
-                    {plan.targetCompanies.slice(0, 4).map((tc) => (
-                      <Badge
-                        key={tc.company.slug}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {tc.company.name}
-                      </Badge>
-                    ))}
-                    {plan.targetCompanies.length > 4 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{plan.targetCompanies.length - 4}
-                      </Badge>
-                    )}
-                  </div>
+                {/* Actions */}
+                <div className="flex gap-2">
+                    <Link
+                      href={`/dashboard/plans/${plan.id}`}
+                      className="flex-1 btn-primary text-xs py-2.5 flex items-center justify-center gap-1"
+                    >
+                      {solved > 0 ? "Resume" : "Start Plan"}
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
 
-                  {/* Progress */}
-                  <div className="space-y-1.5 mb-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">
-                        {solved}/{total} solved · {pct}%
-                      </span>
-                    </div>
-                    <Progress value={pct} className="h-1.5" />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Link href={`/dashboard/plans/${plan.id}`} className="flex-1">
-                      <Button size="sm" className="w-full" variant="default">
-                        Continue
-                        <ChevronRight className="h-3 w-3 ml-1" />
-                      </Button>
-                    </Link>
-                    <Link href={`/dashboard/plans/${plan.id}/analytics`}>
-                      <Button size="sm" variant="outline" title="Analytics">
-                        <BarChart3 className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    <Link href={`/dashboard/plans/${plan.id}/revisions`}>
-                      <Button size="sm" variant="outline" title="Revisions">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
+                  <Link
+                    href={`/dashboard/plans/${plan.id}/analytics`}
+                    className="w-9 h-9 rounded-lg border border-white/[0.06] bg-transparent flex items-center justify-center text-[#8b8d9e] hover:bg-[#1a1b26] hover:text-[#f0f0f5] transition-all"
+                    title="Analytics"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href={`/dashboard/plans/${plan.id}/revisions`}
+                    className="w-9 h-9 rounded-lg border border-white/[0.06] bg-transparent flex items-center justify-center text-[#8b8d9e] hover:bg-[#1a1b26] hover:text-[#f0f0f5] transition-all"
+                    title="Revisions"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Link>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+        {plans.length > 0 && filteredPlans.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-sm text-[#8b8d9e] mb-3">No plans match this filter</p>
+            <button
+              onClick={() => setStatusFilter("ALL")}
+              className="text-xs text-primary hover:underline"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDeleteConfirm(null)}
+          />
+          <div className="relative bg-[#12131a] border border-white/[0.06] rounded-2xl p-6 max-w-sm w-full mx-4 animate-scale-in">
+            <h3 className="text-base font-semibold text-[#f0f0f5] mb-2">
+              Delete Plan
+            </h3>
+            <p className="text-sm text-[#8b8d9e] mb-6">
+              Are you sure you want to delete this plan? This action cannot be
+              undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="btn-secondary text-sm py-2 px-4"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deletePlan(deleteConfirm)}
+                disabled={deletingId !== null}
+                className="text-sm py-2 px-4 rounded-lg font-medium bg-[#f87171] text-white hover:brightness-110 transition-all disabled:opacity-50"
+              >
+                {deletingId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -30,6 +30,7 @@ export async function GET(
         weeklyHours: true,
         difficultyPreference: true,
         status: true,
+        createdAt: true,
         targetCompanies: {
           select: { company: { select: { name: true, slug: true } } },
         },
@@ -65,6 +66,10 @@ export async function GET(
               // KEY FIX: only fetch pending revisions
               where: { status: "PENDING" },
               take: 4,
+            },
+            notes: {
+              select: { content: true },
+              take: 1,
             },
           },
           orderBy: [{ weekNumber: "asc" }, { order: "asc" }],

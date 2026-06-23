@@ -31,6 +31,7 @@ import {
   BookOpen,
   Gauge,
   Sparkles,
+  Plus,
 } from "lucide-react";
 
 const AnimatedStep = dynamic(
@@ -59,6 +60,7 @@ export default function NewPlanPage() {
   const [weeklyHours, setWeeklyHours] = useState(10);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [companySearch, setCompanySearch] = useState("");
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
   const [topicMode, setTopicMode] = useState<"ALL" | "RECOMMENDED" | "CUSTOM">(
     "ALL"
   );
@@ -68,9 +70,31 @@ export default function NewPlanPage() {
   const [difficultyPreference, setDifficultyPreference] =
     useState<DifficultyPreference>("MEDIUM");
 
-  const filteredCompanies = COMPANIES.filter((c) =>
-    c.name.toLowerCase().includes(companySearch.toLowerCase())
-  );
+  const filteredCompanies = COMPANIES.filter(
+    (c) =>
+      c.name.toLowerCase().includes(companySearch.toLowerCase()) ||
+      c.slug.toLowerCase().includes(companySearch.toLowerCase())
+  ).filter((c) => !selectedCompanies.includes(c.id));
+
+  const isCustomCompany =
+    companySearch.trim().length > 0 &&
+    !COMPANIES.some(
+      (c) => c.name.toLowerCase() === companySearch.trim().toLowerCase()
+    );
+
+  const addCustomCompany = () => {
+    const name = companySearch.trim();
+    if (!name) return;
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    if (!selectedCompanies.includes(slug)) {
+      setSelectedCompanies((prev) => [...prev, slug]);
+    }
+    setCompanySearch("");
+    setShowCompanyDropdown(false);
+  };
 
   const toggleCompany = (companyId: string) => {
     setSelectedCompanies((prev) =>
@@ -78,6 +102,16 @@ export default function NewPlanPage() {
         ? prev.filter((id) => id !== companyId)
         : [...prev, companyId]
     );
+    setCompanySearch("");
+  };
+
+  const getCompanyName = (slug: string) => {
+    const found = COMPANIES.find((c) => c.id === slug);
+    if (found) return found.name;
+    return slug
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
   };
 
   const toggleTopic = (topic: string) => {
@@ -137,36 +171,34 @@ export default function NewPlanPage() {
         </p>
       </div>
 
-      <div className="flex items-center justify-between glass-card rounded-2xl p-4 border-border/50">
-        {steps.map((step, index) => (
-          <div key={step.id} className="flex items-center">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200",
-                currentStep === step.id
-                  ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/20"
-                  : currentStep > step.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted/50"
-              )}
-            >
-              {currentStep > step.id ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <step.icon className="h-4 w-4" />
-              )}
-              <span className="hidden md:inline">{step.title}</span>
-            </div>
-            {index < steps.length - 1 && (
+      <div className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground text-center">Step {currentStep} of {steps.length}</p>
+        <div className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 bg-white/5 rounded-2xl border border-white/10">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex items-center">
               <div
                 className={cn(
-                  "h-px w-8 mx-2 transition-colors",
-                  currentStep > step.id ? "bg-primary" : "bg-border"
+                  "flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all",
+                  currentStep === step.id
+                    ? "bg-violet-600 text-white"
+                    : currentStep > step.id
+                      ? "bg-white/10 text-white/70"
+                      : "text-white/30"
                 )}
-              />
-            )}
-          </div>
-        ))}
+              >
+                {currentStep > step.id ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <step.icon className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden md:inline">{step.title}</span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className="flex-1 h-px bg-white/10 min-w-[12px] max-w-[40px] mx-1" />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <AnimatedStep stepKey={currentStep}>
@@ -327,34 +359,84 @@ export default function NewPlanPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Companies are ordered by priority. First selected = highest
+                  priority.
+                </p>
+                {selectedCompanies.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCompanies.map((id, idx) => (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-destructive/10 hover:text-destructive gap-1"
+                        onClick={() => toggleCompany(id)}
+                      >
+                        <span className="text-xs opacity-60">#{idx + 1}</span>{" "}
+                        {getCompanyName(id)} ×
+                      </Badge>
+                    ))}
+                  </div>
+                )}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search companies..."
+                    placeholder="Search companies (Google, TCS, Microsoft...)"
                     value={companySearch}
-                    onChange={(e) => setCompanySearch(e.target.value)}
+                    onChange={(e) => {
+                      setCompanySearch(e.target.value);
+                      setShowCompanyDropdown(true);
+                    }}
+                    onFocus={() => setShowCompanyDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 200)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && companySearch.trim()) {
+                        e.preventDefault();
+                        if (filteredCompanies.length > 0) {
+                          toggleCompany(filteredCompanies[0].id);
+                        } else if (isCustomCompany) {
+                          addCustomCompany();
+                        }
+                      }
+                    }}
                     className="pl-10"
                   />
+                  {showCompanyDropdown &&
+                    (filteredCompanies.length > 0 || isCustomCompany) && (
+                      <div className="absolute z-50 top-full mt-1 w-full bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {filteredCompanies.slice(0, 12).map((company) => (
+                          <button
+                            key={company.id}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              toggleCompany(company.id);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                          >
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            {company.name}
+                          </button>
+                        ))}
+                        {isCustomCompany && (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              addCustomCompany();
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2 border-t border-border text-primary"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add &quot;{companySearch.trim()}&quot; as custom
+                            company
+                          </button>
+                        )}
+                      </div>
+                    )}
                 </div>
-                {selectedCompanies.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCompanies.map((id) => {
-                      const company = COMPANIES.find((c) => c.id === id);
-                      return company ? (
-                        <Badge
-                          key={id}
-                          variant="secondary"
-                          className="cursor-pointer hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => toggleCompany(id)}
-                        >
-                          {company.name} ×
-                        </Badge>
-                      ) : null;
-                    })}
-                  </div>
-                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {filteredCompanies.map((company) => (
+                  {filteredCompanies.slice(0, 24).map((company) => (
                     <button
                       key={company.id}
                       onClick={() => toggleCompany(company.id)}
