@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, ChevronRight, Check, ArrowRight, Menu, X } from "lucide-react";
+import { ChevronRight, Check, ArrowRight, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function HomePage() {
@@ -188,9 +188,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
+              <span className="text-white font-bold text-sm">A</span>
             </div>
-            <span className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>InterviewPilot</span>
+            <span className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>AlgoPath</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>Features</a>
@@ -464,7 +464,7 @@ export default function HomePage() {
               <span className="hero-gradient-text">Ace Your Interview</span>
             </h2>
             <p className="anim from-bottom anim-d2 max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              No more guessing what to study. InterviewPilot gives you a complete system.
+              No more guessing what to study. AlgoPath gives you a complete system.
             </p>
           </div>
 
@@ -718,9 +718,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-white" />
+              <span className="text-white font-bold text-xs">A</span>
             </div>
-            <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>InterviewPilot</span>
+            <span className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>AlgoPath</span>
           </div>
           <div className="flex items-center gap-6 text-sm" style={{ color: "var(--text-secondary)" }}>
             <a href="#features" className="transition-colors" style={{ color: "inherit" }}>Features</a>
@@ -728,7 +728,7 @@ export default function HomePage() {
             <a href="https://github.com/arpit1021-ux" target="_blank" rel="noopener noreferrer" className="transition-colors" style={{ color: "inherit" }}>GitHub</a>
           </div>
           <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-            &copy; {new Date().getFullYear()} InterviewPilot. All rights reserved.
+            &copy; {new Date().getFullYear()} AlgoPath. All rights reserved.
           </div>
         </div>
       </footer>

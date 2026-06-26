@@ -1,3 +1,3 @@
 import { Inngest } from "inngest";
 
-export const inngest = new Inngest({ id: "interviewpilot" });
+export const inngest = new Inngest({ id: "algopath" });

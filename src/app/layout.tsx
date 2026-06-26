@@ -16,17 +16,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InterviewPilot — Smart LeetCode Prep",
+  title: "AlgoPath — Smart LeetCode Prep",
   description:
     "Stop grinding randomly. Build a personalized week-by-week LeetCode roadmap based on your target companies. Free forever.",
   keywords: ["leetcode", "interview prep", "coding interview", "FAANG prep", "DSA", "data structures"],
   openGraph: {
-    title: "InterviewPilot — Grind SMART",
+    title: "AlgoPath — Grind SMART",
     description: "Personalized LeetCode roadmaps weighted by company frequency.",
     type: "website",
   },
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>",
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><text x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='white'>A</text></svg>",
   },
 };
 

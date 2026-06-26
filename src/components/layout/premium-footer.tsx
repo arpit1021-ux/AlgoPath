@@ -12,7 +12,7 @@ export function Footer() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] flex items-center justify-center">
                 <Rocket className="w-4 h-4 text-white -rotate-12" />
               </div>
-              <span className="font-bold text-[#f0f0f5]">InterviewPilot</span>
+              <span className="font-bold text-[#f0f0f5]">AlgoPath</span>
             </Link>
             <p className="text-sm text-[#8b8d9e] leading-relaxed">
               AI-powered interview preparation for ambitious engineers.
@@ -100,7 +100,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-12 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-[#4b4d5e]">
-            &copy; 2025 InterviewPilot. All rights reserved.
+            &copy; 2025 AlgoPath. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <span className="text-xs text-[#4b4d5e] hover:text-[#8b8d9e] cursor-pointer transition-colors">

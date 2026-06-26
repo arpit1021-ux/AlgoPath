@@ -10,7 +10,6 @@ import {
   BarChart3,
   Trophy,
   User,
-  Zap,
   Menu,
   X,
   Map,
@@ -88,10 +87,10 @@ export default function DashboardLayout({
       <div className="p-5" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] flex items-center justify-center">
-            <Zap className="w-4 h-4 text-white" />
+            <span className="text-white font-bold text-sm">A</span>
           </div>
           <span className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>
-            InterviewPilot
+            AlgoPath
           </span>
         </Link>
       </div>
