@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { getAllProblems, mapDifficulty, getLeetCodeUrl } from "@/lib/leetcode";
 import { slugify } from "@/lib/utils";
 
+const ADMIN_IDS = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
+
 export async function POST(_request: NextRequest) {
   try {
+    const { userId: clerkId } = await auth();
+    const cronSecret = _request.headers.get("authorization")?.replace("Bearer ", "");
+    const isCronCall = process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
+
+    if (!isCronCall) {
+      if (!clerkId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (ADMIN_IDS.length > 0 && !ADMIN_IDS.includes(clerkId)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
     const problems = getAllProblems();
     let created = 0;
     let updated = 0;

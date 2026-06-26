@@ -131,7 +131,7 @@ function RevisionCard({
 
 export default function RevisionsPage() {
   const params = useParams();
-  const planId = params.planId as string;
+  const planSlug = params.planSlug as string;
   const [todayRevisions, setTodayRevisions] = useState<Revision[]>([]);
   const [overdueRevisions, setOverdueRevisions] = useState<Revision[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +139,7 @@ export default function RevisionsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/revisions?planId=${planId}`)
+    fetch(`/api/revisions?planSlug=${planSlug}`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) {
@@ -150,7 +150,7 @@ export default function RevisionsPage() {
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [planId]);
+  }, [planSlug]);
 
   const completeRevision = async (revisionId: string) => {
     // Optimistic remove
@@ -167,7 +167,7 @@ export default function RevisionsPage() {
     } catch (e) {
       console.error(e);
       // Rollback on error
-      fetch(`/api/revisions?planId=${planId}`)
+      fetch(`/api/revisions?planSlug=${planSlug}`)
         .then((r) => r.json())
         .then((data) => {
           setTodayRevisions(data.today ?? []);
@@ -184,8 +184,15 @@ export default function RevisionsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground animate-pulse">Loading revisions...</div>
+      <div className="space-y-4 p-6 animate-pulse">
+        <div className="h-8 w-48 rounded-xl bg-white/5" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 rounded-xl bg-white/5" />
+          ))}
+        </div>
+        <div className="h-64 rounded-xl bg-white/5" />
+        <div className="h-64 rounded-xl bg-white/5" />
       </div>
     );
   }
@@ -196,7 +203,7 @@ export default function RevisionsPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/plans/${planId}`}>
+        <Link href={`/dashboard/plans/${planSlug}`}>
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Plan
@@ -212,13 +219,13 @@ export default function RevisionsPage() {
 
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardContent className="pt-5">
             <p className="text-xs text-muted-foreground mb-1">Due Today</p>
             <div className="text-3xl font-bold text-primary">{todayRevisions.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardContent className="pt-5">
             <p className="text-xs text-muted-foreground mb-1">Overdue</p>
             <div className={cn(
@@ -229,7 +236,7 @@ export default function RevisionsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardContent className="pt-5">
             <p className="text-xs text-muted-foreground mb-1">Total Pending</p>
             <div className="text-3xl font-bold">{totalDue}</div>
@@ -239,23 +246,29 @@ export default function RevisionsPage() {
 
       {/* All done state */}
       {totalDue === 0 && (
-        <Card className="border-border/50">
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <CheckCircle2 className="h-14 w-14 mx-auto mb-4 text-green-500 opacity-80" />
-            <p className="text-lg font-semibold text-foreground">All caught up!</p>
-            <p className="text-sm mt-1">
-              No revisions due. Solve more problems to generate revision tasks.
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
+          <CardContent className="py-20 text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <p className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>All caught up!</p>
+            <p className="text-slate-500 text-sm max-w-xs mx-auto mb-6">
+              No revisions due. Keep solving problems to build your revision queue.
             </p>
-            <Link href={`/dashboard/plans/${planId}`} className="mt-4 inline-block">
-              <Button variant="outline" size="sm">Back to Roadmap</Button>
-            </Link>
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-600">
+              <span className="px-2 py-1 rounded bg-white/5">2d</span>
+              <span>→</span>
+              <span className="px-2 py-1 rounded bg-white/5">7d</span>
+              <span>→</span>
+              <span className="px-2 py-1 rounded bg-white/5">21d</span>
+              <span>→</span>
+              <span className="px-2 py-1 rounded bg-white/5">45d</span>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Overdue */}
       {overdueRevisions.length > 0 && (
-        <Card className="border-yellow-500/20">
+        <Card className="border-yellow-500/20" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -282,7 +295,7 @@ export default function RevisionsPage() {
 
       {/* Today */}
       {todayRevisions.length > 0 && (
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
@@ -308,7 +321,7 @@ export default function RevisionsPage() {
       )}
 
       {/* How it works */}
-      <Card className="border-border/50 bg-muted/30">
+      <Card className="border-border/50 bg-muted/30" style={{ boxShadow: "var(--shadow-sm)" }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">How Spaced Repetition Works</CardTitle>
         </CardHeader>

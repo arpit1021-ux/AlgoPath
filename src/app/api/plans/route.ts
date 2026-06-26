@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { generateRoadmap } from "@/lib/roadmap-generator";
-import { slugify } from "@/lib/utils";
+import { slugify, generatePlanSlug } from "@/lib/utils";
 import { getAllProblems, mapDifficulty, getLeetCodeUrl } from "@/lib/leetcode";
+import { planCreationLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
 
 async function getOrCreateUser(clerkId: string) {
   return db.user.upsert({
@@ -140,6 +143,18 @@ async function ensureProblemsSeeded() {
   return seedPromise;
 }
 
+const CreatePlanSchema = z.object({
+  name: z.string().min(1, "Name required").max(100, "Name too long").trim(),
+  description: z.string().max(500).optional().nullable(),
+  experienceLevel: z.enum(["BEGINNER", "INTERMEDIATE", "EXPERT"]),
+  timelineWeeks: z.number().int().min(1).max(52),
+  weeklyHours: z.number().min(1).max(80),
+  targetCompanies: z.array(z.string().max(50)).max(20),
+  topicMode: z.enum(["ALL", "RECOMMENDED", "CUSTOM"]),
+  selectedTopics: z.array(z.string().max(50)).max(50),
+  difficultyPreference: z.enum(["VERY_EASY", "EASY", "MEDIUM", "HARD", "VERY_HARD"]),
+});
+
 // GET /api/plans — list all plans for current user
 export async function GET(request: NextRequest) {
   try {
@@ -154,7 +169,7 @@ export async function GET(request: NextRequest) {
     }
 
     const plans = await db.plan.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -175,9 +190,12 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ plans });
+    return NextResponse.json(
+      { plans },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
+    );
   } catch (error) {
-    console.error("Failed to fetch plans:", error);
+    logError(error, { route: "GET /api/plans" });
     return NextResponse.json({ error: "Failed to fetch plans" }, { status: 500 });
   }
 }
@@ -189,44 +207,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await getOrCreateUser(clerkId);
-    const body = await request.json();
-    const {
-      name,
-      description,
-      experienceLevel,
-      timelineWeeks,
-      weeklyHours,
-      targetCompanies = [],
-      topicMode = "ALL",
-      selectedTopics = [],
-      difficultyPreference,
-    } = body;
-
-    // Validate required fields
-    if (!name || !experienceLevel || !timelineWeeks || !weeklyHours) {
+    const { blocked, response } = await checkRateLimit(planCreationLimiter, `user_${clerkId}`);
+    if (blocked) {
       return NextResponse.json(
-        { error: "Missing required fields: name, experienceLevel, timelineWeeks, weeklyHours" },
+        { error: "Too many requests", message: JSON.parse(await response!.text()).message },
+        { status: 429 }
+      );
+    }
+
+    const body = await request.json();
+    const parsed = CreatePlanSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten() },
         { status: 400 }
+      );
+    }
+
+    const user = await getOrCreateUser(clerkId);
+
+    const recentDuplicate = await db.plan.findFirst({
+      where: {
+        userId: user.id,
+        name: parsed.data.name,
+        createdAt: { gte: new Date(Date.now() - 10000) },
+      },
+    });
+    if (recentDuplicate) {
+      return NextResponse.json(
+        { plan: { id: recentDuplicate.id, name: recentDuplicate.name } },
+        { status: 200 }
       );
     }
 
     await ensureProblemsSeeded();
 
+    const { name, description, experienceLevel, timelineWeeks, weeklyHours, targetCompanies, topicMode, selectedTopics, difficultyPreference } = parsed.data;
+
+    let slug = generatePlanSlug(name);
+    const existing = await db.plan.findFirst({
+      where: { userId: user.id, slug, deletedAt: null },
+      select: { id: true },
+    });
+    if (existing) {
+      slug = `${slug}-${Date.now().toString(36)}`;
+    }
+
     const plan = await db.plan.create({
       data: {
         userId: user.id,
         name,
+        slug,
         description: description || null,
         experienceLevel,
         timelineWeeks: Number(timelineWeeks),
         weeklyHours: Number(weeklyHours),
-        difficultyPreference: difficultyPreference || "BALANCED",
+        difficultyPreference,
         startDate: new Date(),
       },
     });
 
-    // Upsert + link companies
     for (const companySlug of targetCompanies) {
       const company = await db.company.upsert({
         where: { slug: companySlug },
@@ -243,7 +283,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Upsert + link topics
     for (const topicName of selectedTopics) {
       const tag = await db.tag.upsert({
         where: { slug: slugify(topicName) },
@@ -259,22 +298,19 @@ export async function POST(request: NextRequest) {
 
     await generateRoadmap(plan.id, {
       name,
-      description,
+      description: description ?? undefined,
       experienceLevel,
       timelineWeeks: Number(timelineWeeks),
       weeklyHours: Number(weeklyHours),
       targetCompanies,
       topicMode,
       selectedTopics,
-      difficultyPreference: difficultyPreference || "BALANCED",
+      difficultyPreference,
     });
 
-    return NextResponse.json({ plan: { id: plan.id, name: plan.name } }, { status: 201 });
+    return NextResponse.json({ plan: { id: plan.id, name: plan.name, slug: plan.slug } }, { status: 201 });
   } catch (error) {
-    console.error("Failed to create plan:", error);
-    return NextResponse.json(
-      { error: "Failed to create plan", details: String(error) },
-      { status: 500 }
-    );
+    logError(error, { route: "POST /api/plans" });
+    return NextResponse.json({ error: "Failed to create plan" }, { status: 500 });
   }
 }

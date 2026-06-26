@@ -69,6 +69,7 @@ model User {
   activityLogs ActivityLog[]
   badges       UserBadge[]
 
+  @@index([clerkId])
   @@map("users")
 }
 
@@ -82,6 +83,7 @@ model Company {
   problems CompanyProblemFrequency[]
   plans    PlanCompany[]
 
+  @@index([slug])
   @@map("companies")
 }
 
@@ -103,6 +105,8 @@ model Problem {
   companies    CompanyProblemFrequency[]
   planProblems PlanProblem[]
 
+  @@index([difficulty])
+  @@index([isPremium])
   @@map("problems")
 }
 
@@ -114,6 +118,7 @@ model Tag {
   problems Problem[]
   plans    PlanTag[]
 
+  @@index([slug])
   @@map("tags")
 }
 
@@ -128,6 +133,9 @@ model CompanyProblemFrequency {
   problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, problemId])
+  @@index([companyId])
+  @@index([problemId])
+  @@index([companyId, frequency])
   @@map("company_problem_frequencies")
 }
 
@@ -135,6 +143,7 @@ model Plan {
   id                   String               @id @default(cuid())
   userId               String
   name                 String
+  slug                 String  @default("")
   description          String?
   experienceLevel      ExperienceLevel
   timelineWeeks        Int
@@ -144,6 +153,7 @@ model Plan {
   startDate            DateTime             @default(now())
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  deletedAt            DateTime?
 
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   targetCompanies PlanCompany[]
@@ -151,6 +161,12 @@ model Plan {
   problems        PlanProblem[]
   activityLogs    ActivityLog[]
 
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, slug], name: "plan_user_slug_idx")
+  @@unique([userId, slug])
+  @@index([createdAt])
+  @@index([userId, deletedAt])
   @@map("plans")
 }
 
@@ -193,6 +209,10 @@ model PlanProblem {
   notes     Note[]
 
   @@unique([planId, problemId])
+  @@index([planId])
+  @@index([planId, status])
+  @@index([planId, weekNumber])
+  @@index([planId, weekNumber, order])
   @@map("plan_problems")
 }
 
@@ -209,6 +229,10 @@ model Revision {
   planProblem PlanProblem @relation(fields: [planProblemId], references: [id], onDelete: Cascade)
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, scheduledDate])
+  @@index([planProblemId])
   @@map("revisions")
 }
 
@@ -239,6 +263,9 @@ model ActivityLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, planId])
   @@map("activity_logs")
 }
 

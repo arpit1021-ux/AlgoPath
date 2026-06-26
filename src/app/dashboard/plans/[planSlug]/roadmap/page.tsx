@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { showToast } from "@/components/ui/toast";
 import {
   ExternalLink,
   CheckCircle2,
   Clock,
-  SkipForward,
   RotateCcw,
   BarChart3,
   ChevronDown,
@@ -63,9 +63,9 @@ const DIFF_COLORS: Record<string, string> = {
   HARD:   "bg-red-100 text-red-700 border-red-200",
 };
 
-export default function PlanDetailPage() {
+export default function PlanRoadmapPage() {
   const params = useParams();
-  const planId = params.planId as string;
+  const planSlug = params.planSlug as string;
   const [plan, setPlan] = useState<Plan | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(true);
@@ -73,10 +73,11 @@ export default function PlanDetailPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
+  const [celebrationWeek, setCelebrationWeek] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/plans/${planId}`)
+    fetch(`/api/plans/${planSlug}`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) {
@@ -100,29 +101,47 @@ export default function PlanDetailPage() {
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [planId]);
+  }, [planSlug]);
 
-  const updateProblemStatus = async (planProblemId: string, status: string) => {
+  const updateProblemStatus = async (planProblemId: string, status: string, weekNumber: number) => {
     setPlan((prev) => {
       if (!prev) return prev;
-      return {
+      const updated = {
         ...prev,
         problems: prev.problems.map((p) =>
           p.id === planProblemId ? { ...p, status } : p
         ),
       };
+
+      if (status === "SOLVED") {
+        const weekProblems = updated.problems.filter(
+          (p) => p.weekNumber === weekNumber
+        );
+        const allSolved = weekProblems.every((p) => p.status === "SOLVED");
+        if (allSolved && weekProblems.length > 0) {
+          setTimeout(() => setCelebrationWeek(weekNumber), 300);
+        }
+      }
+
+      return updated;
     });
     try {
-      const res = await fetch(`/api/plans/${planId}/problems`, {
+      const res = await fetch(`/api/plans/${planSlug}/problems`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planProblemId, status }),
       });
+      if (res.status === 429) {
+        const data = await res.json();
+        showToast({ type: "error", message: data.message || "Too many requests. Please slow down." });
+        fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
+        return;
+      }
       if (!res.ok) {
-        fetch(`/api/plans/${planId}`).then((r) => r.json()).then((d) => setPlan(d.plan));
+        fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
       }
     } catch {
-      fetch(`/api/plans/${planId}`).then((r) => r.json()).then((d) => setPlan(d.plan));
+      fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
     }
   };
 
@@ -131,7 +150,7 @@ export default function PlanDetailPage() {
     setMarkingAll(weekProblems[0]?.weekNumber ?? null);
     const unsolved = weekProblems.filter((p) => p.status !== "SOLVED");
     for (const pp of unsolved) {
-      await updateProblemStatus(pp.id, "SOLVED");
+      await updateProblemStatus(pp.id, "SOLVED", pp.weekNumber);
     }
     setMarkingAll(null);
   };
@@ -172,7 +191,7 @@ export default function PlanDetailPage() {
     return (
       <div className="text-center py-16">
         <h2 className="text-xl font-semibold">Plan not found</h2>
-        <Link href="/dashboard/plans" className="mt-4 inline-block">
+        <Link href="/dashboard" className="mt-4 inline-block">
           <Button>Back to Plans</Button>
         </Link>
       </div>
@@ -194,7 +213,6 @@ export default function PlanDetailPage() {
     plan.timelineWeeks
   );
 
-  // Topic distribution
   const topicCounts: Record<string, { total: number; solved: number }> = {};
   plan.problems.forEach((pp) => {
     pp.problem.tags.forEach((t) => {
@@ -205,7 +223,6 @@ export default function PlanDetailPage() {
   });
   const topicsSorted = Object.entries(topicCounts).sort((a, b) => b[1].total - a[1].total);
 
-  // Difficulty breakdown
   const diffCounts = { EASY: 0, MEDIUM: 0, HARD: 0 };
   plan.problems.forEach((p) => {
     const d = p.problem.difficulty as keyof typeof diffCounts;
@@ -246,21 +263,23 @@ export default function PlanDetailPage() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-0 min-h-screen -mx-6 -mt-6">
-
-      {/* ── LEFT SIDEBAR ── */}
+      <div className="flex flex-col lg:flex-row gap-0 min-h-screen -mx-6 -mt-6">
       <aside
-        className={cn(
-          "shrink-0 border-r bg-card overflow-y-auto transition-all duration-300 ease-in-out",
-          "lg:sticky lg:top-0 lg:h-screen",
-          "flex lg:flex-col overflow-x-auto lg:overflow-x-hidden",
-          sidebarOpen ? "lg:w-72 p-5 space-y-6" : "lg:w-14 p-2 space-y-4"
-        )}
+        className="shrink-0 overflow-y-auto transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen flex lg:flex-col overflow-x-auto lg:overflow-x-hidden"
+        style={{
+          background: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+          width: sidebarOpen ? undefined : 56,
+          padding: sidebarOpen ? 20 : 8,
+          gap: sidebarOpen ? 24 : 16,
+        }}
       >
-        {/* Toggle button */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="hidden lg:flex w-full items-center justify-center p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+          className="hidden lg:flex w-full items-center justify-center p-1.5 rounded-lg transition-colors"
+          style={{ color: "var(--text-muted)" }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-input-hover)"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
           {sidebarOpen ? (
@@ -270,12 +289,13 @@ export default function PlanDetailPage() {
           )}
         </button>
 
-        {/* Plan name + status */}
         <div>
           {sidebarOpen ? (
             <>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-lg font-bold truncate whitespace-nowrap">{plan.name}</h1>
+                <Link href={`/dashboard/plans/${planSlug}`} className="text-lg font-bold truncate whitespace-nowrap hover:text-primary transition-colors">
+                  {plan.name}
+                </Link>
                 <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs shrink-0">
                   {plan.status}
                 </Badge>
@@ -291,7 +311,6 @@ export default function PlanDetailPage() {
           )}
         </div>
 
-        {/* Progress */}
         {sidebarOpen && (
           <div className="space-y-2 hidden lg:block">
             <div className="flex justify-between text-sm">
@@ -300,10 +319,12 @@ export default function PlanDetailPage() {
             </div>
             <Progress value={completionRate} className="h-2" />
             <p className="text-xs text-muted-foreground">{completionRate}% complete</p>
+            <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              Week {currentWeek} of {plan.timelineWeeks}
+            </div>
           </div>
         )}
 
-        {/* Config */}
         {sidebarOpen && (
           <div className="space-y-3 text-sm hidden lg:block">
             <div className="flex justify-between">
@@ -327,7 +348,6 @@ export default function PlanDetailPage() {
           </div>
         )}
 
-        {/* Difficulty breakdown */}
         {sidebarOpen && (
           <div className="space-y-2 hidden lg:block">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -346,7 +366,6 @@ export default function PlanDetailPage() {
           </div>
         )}
 
-        {/* Target companies */}
         {sidebarOpen && plan.targetCompanies.length > 0 && (
           <div className="space-y-2 hidden lg:block">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -362,33 +381,37 @@ export default function PlanDetailPage() {
           </div>
         )}
 
-        {/* Action buttons */}
-        <div className={cn("space-y-2 pt-2 hidden lg:block", !sidebarOpen && "hidden")}>
-          <Link href={`/dashboard/plans/${planId}/analytics`} className="block">
-            <Button variant="outline" size="sm" className="w-full justify-start">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Analytics
-            </Button>
-          </Link>
-          <Link href={`/dashboard/plans/${planId}/revisions`} className="block">
-            <Button variant="outline" size="sm" className="w-full justify-start">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Revisions
-            </Button>
-          </Link>
-        </div>
+        {sidebarOpen && (
+          <div className="space-y-2 pt-2 hidden lg:block">
+            <Link href={`/dashboard/plans/${planSlug}`} className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link href={`/dashboard/plans/${planSlug}/analytics`} className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Analytics
+              </Button>
+            </Link>
+            <Link href={`/dashboard/plans/${planSlug}/revisions`} className="block">
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Revisions
+              </Button>
+            </Link>
+          </div>
+        )}
       </aside>
 
-      {/* ── RIGHT PANEL ── */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
-
-        {/* Topic distribution bar */}
-        <div className="bg-card border rounded-xl p-4 space-y-3">
+      <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6" style={{ background: "var(--bg-primary)" }}>
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--bg-card)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
               Topic Distribution
             </p>
-            <span className="text-xs font-semibold text-primary">
+            <span className="text-xs font-semibold" style={{ color: "var(--accent-text)" }}>
               {solvedProblems} / {totalProblems} SOLVED
             </span>
           </div>
@@ -401,7 +424,7 @@ export default function PlanDetailPage() {
                   "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors",
                   activeTopicFilter === topic
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/50 hover:bg-muted border-border text-foreground"
+                    : "hover:bg-[var(--bg-input-hover)] border-border text-foreground"
                 )}
               >
                 {topic}
@@ -416,14 +439,14 @@ export default function PlanDetailPage() {
             {activeTopicFilter && (
               <button
                 onClick={() => setActiveTopicFilter(null)}
-                className="px-2.5 py-1 rounded-full border text-xs text-muted-foreground hover:bg-muted transition-colors"
+                className="px-2.5 py-1 rounded-full border text-xs hover:bg-[var(--bg-input-hover)] transition-colors"
+                style={{ color: "var(--text-muted)" }}
               >
                 Clear filter ✕
               </button>
             )}
           </div>
 
-          {/* Total progress bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Total Progress</span>
@@ -433,11 +456,70 @@ export default function PlanDetailPage() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground/50">
+        <p className="text-xs" style={{ color: "var(--text-placeholder)" }}>
           Tip: Click any topic pill to filter problems by topic
         </p>
 
-        {/* Week blocks */}
+        {(() => {
+          if (!plan.createdAt) return null;
+          
+          const planAgeMs = Date.now() - new Date(plan.createdAt).getTime();
+          const planAgeDays = planAgeMs / (1000 * 60 * 60 * 24);
+          const planAgeWeeks = planAgeDays / 7;
+          
+          const totalP = plan.problems.length;
+          const expectedSolvedByNow = Math.floor(
+            (planAgeWeeks / plan.timelineWeeks) * totalP
+          );
+          const actualSolved = plan.problems.filter(p => p.status === "SOLVED").length;
+          const diff = actualSolved - expectedSolvedByNow;
+          
+          if (planAgeDays < 1 || actualSolved === 0) return null;
+          
+          if (diff >= 5) {
+            return (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm mb-2">
+                <span className="text-xl">🚀</span>
+                <div>
+                  <span className="text-green-400 font-semibold">
+                    {diff} problems ahead of schedule!
+                  </span>
+                  <span className="text-green-300/60 ml-2">
+                    At this pace you'll finish {Math.round(diff / (totalP / plan.timelineWeeks / 7))} days early.
+                  </span>
+                </div>
+              </div>
+            );
+          } else if (diff >= 0) {
+            return (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm mb-2">
+                <span className="text-xl">⚡</span>
+                <span className="text-blue-400 font-semibold">
+                  On track — {actualSolved} problems solved, right on schedule.
+                </span>
+              </div>
+            );
+          } else if (diff >= -5) {
+            return (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-sm mb-2">
+                <span className="text-xl">⏰</span>
+                <span className="text-yellow-400 font-semibold">
+                  {Math.abs(diff)} problems behind schedule. Solve {Math.abs(diff)} more to catch up.
+                </span>
+              </div>
+            );
+          } else {
+            return (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm mb-2">
+                <span className="text-xl">📅</span>
+                <span className="text-red-400 font-semibold">
+                  {Math.abs(diff)} problems behind. Consider increasing daily practice time.
+                </span>
+              </div>
+            );
+          }
+        })()}
+
         <div className="space-y-3">
           {Object.entries(problemsByWeek)
             .sort(([a], [b]) => Number(a) - Number(b))
@@ -451,17 +533,19 @@ export default function PlanDetailPage() {
               const dots = weekDiffDots(problems);
 
               return (
-                <div key={week} className={cn("bg-card border rounded-xl overflow-hidden", isCurrentWeek && "border-primary/30")}>
-                  {/* Week header */}
+                <div key={week} id={`week-${weekNum}`} className="rounded-xl overflow-hidden" style={{ background: "var(--bg-card)", border: isCurrentWeek ? "1px solid var(--accent-border)" : "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}>
                   <button
                     onClick={() => toggleWeek(weekNum)}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+                    className="w-full flex items-center justify-between px-5 py-4 transition-colors"
+                    style={{ color: "var(--text-primary)" }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-input-hover)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-base">Week {weekNum}</h3>
                         {isCurrentWeek && (
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "var(--accent-dim)", color: "var(--accent-text)" }}>
                             CURRENT
                           </span>
                         )}
@@ -471,71 +555,65 @@ export default function PlanDetailPage() {
                           value={weekTotal > 0 ? (weekSolved / weekTotal) * 100 : 0}
                           className="w-24 h-1.5"
                         />
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                           {weekSolved}/{weekTotal}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* Difficulty dots */}
                       <div className="flex items-center gap-1.5">
                         {dots.EASY > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                             {dots.EASY}
                           </span>
                         )}
                         {dots.MEDIUM > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
                             {dots.MEDIUM}
                           </span>
                         )}
                         {dots.HARD > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                             {dots.HARD}
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {weekEstimatedTime(problems)} estimated
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {visible.length !== problems.length && `${visible.length} shown · `}
                         {weekTotal} problems
                       </span>
                       {isExpanded
-                        ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                        : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ? <ChevronUp className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+                        : <ChevronDown className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
                       }
                     </div>
                   </button>
 
-                  {/* Problem list */}
                   {isExpanded && (
-                    <div className="border-t divide-y">
+                    <div style={{ borderTop: "1px solid var(--border)" }}>
                       {visible.length === 0 ? (
-                        <p className="text-xs text-muted-foreground text-center py-6">
+                        <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>
                           No problems match this topic filter.
                         </p>
                       ) : (
                         visible.map((pp) => (
                           <div key={pp.id}>
                             <div
-                              className={cn(
-                                "flex items-center gap-4 px-5 py-3.5 transition-colors",
-                                pp.status === "SOLVED"
-                                  ? "bg-green-500/5 border-l-4 border-green-500"
-                                  : pp.status === "ATTEMPTED"
-                                  ? "bg-yellow-500/5"
-                                  : "hover:bg-muted/30"
-                              )}
+                              className="flex items-center gap-4 px-5 py-3.5"
+                              style={{
+                                background: pp.status === "SOLVED" ? "var(--success-dim)" : pp.status === "ATTEMPTED" ? "var(--warning-dim)" : "transparent",
+                                borderLeft: pp.status === "SOLVED" ? "4px solid var(--success)" : "none",
+                              }}
                             >
-                              {/* Checkbox-style solve toggle */}
                               <button
                                 onClick={() =>
-                                  updateProblemStatus(pp.id, pp.status === "SOLVED" ? "TODO" : "SOLVED")
+                                  updateProblemStatus(pp.id, pp.status === "SOLVED" ? "TODO" : "SOLVED", pp.weekNumber)
                                 }
                                 className={cn(
                                   "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
@@ -549,24 +627,21 @@ export default function PlanDetailPage() {
                                 )}
                               </button>
 
-                              {/* Problem info */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground w-6 shrink-0">
+                                  <span className="text-xs w-6 shrink-0" style={{ color: "var(--text-muted)" }}>
                                     #{pp.order}
                                   </span>
                                   <a
                                     href={`https://leetcode.com/problems/${pp.problem.titleSlug}/`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={cn(
-                                      "font-medium text-sm hover:underline truncate",
-                                      pp.status === "SOLVED" && "line-through text-muted-foreground opacity-50"
-                                    )}
+                                    className="font-medium text-sm hover:underline truncate"
+                                    style={{ color: pp.status === "SOLVED" ? "var(--text-muted)" : "var(--text-primary)", opacity: pp.status === "SOLVED" ? 0.5 : 1, textDecoration: pp.status === "SOLVED" ? "line-through" : "none" }}
                                   >
                                     {pp.problem.title}
                                   </a>
-                                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <ExternalLink className="h-3 w-3 shrink-0" style={{ color: "var(--text-muted)" }} />
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 ml-8">
                                   <span className={cn(
@@ -575,18 +650,17 @@ export default function PlanDetailPage() {
                                   )}>
                                     {pp.problem.difficulty.charAt(0) + pp.problem.difficulty.slice(1).toLowerCase()}
                                   </span>
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                                     {pp.problem.acceptanceRate.toFixed(1)}% accepted
                                   </span>
                                   {pp.problem.tags.slice(0, 2).map((t) => (
-                                    <span key={t.name} className="text-xs text-muted-foreground">
+                                    <span key={t.name} className="text-xs" style={{ color: "var(--text-muted)" }}>
                                       · {t.name}
                                     </span>
                                   ))}
                                 </div>
                               </div>
 
-                              {/* Right side: company badges + action buttons */}
                               <div className="flex items-center gap-2 shrink-0">
                                 {pp.problem.companies.slice(0, 2).map((c) => (
                                   <Badge key={c.company.name} variant="outline" className="text-xs hidden sm:flex">
@@ -598,18 +672,9 @@ export default function PlanDetailPage() {
                                   size="sm"
                                   className="h-7 w-7 p-0"
                                   title="Mark attempted"
-                                  onClick={() => updateProblemStatus(pp.id, "ATTEMPTED")}
+                                  onClick={() => updateProblemStatus(pp.id, "ATTEMPTED", pp.weekNumber)}
                                 >
                                   <Clock className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  title="Skip"
-                                  onClick={() => updateProblemStatus(pp.id, "SKIPPED")}
-                                >
-                                  <SkipForward className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -626,13 +691,14 @@ export default function PlanDetailPage() {
                               </div>
                             </div>
                             {expandedNotes === pp.id && (
-                              <div className="px-5 py-3 border-t border-border/50">
+                              <div className="px-5 py-3" style={{ borderTop: "1px solid var(--border)" }}>
                                 <textarea
                                   defaultValue={notesMap[pp.id] ?? pp.notes?.[0]?.content ?? ""}
                                   onBlur={(e) => saveNote(pp.id, e.target.value)}
                                   rows={3}
                                   placeholder="Add notes for this problem..."
-                                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                                  className="w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none"
+                                  style={{ background: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
                                 />
                               </div>
                             )}
@@ -640,11 +706,12 @@ export default function PlanDetailPage() {
                         ))
                       )}
                       {visible.length > 0 && visible.some((p) => p.status !== "SOLVED") && (
-                        <div className="px-5 py-3 border-t">
+                        <div className="px-5 py-3" style={{ borderTop: "1px solid var(--border)" }}>
                           <button
                             onClick={() => markAllSolved(problems)}
                             disabled={markingAll === weekNum}
-                            className="text-xs text-primary hover:text-primary/80 font-medium disabled:opacity-50"
+                            className="text-xs font-medium disabled:opacity-50"
+                            style={{ color: "var(--accent-text)" }}
                           >
                             {markingAll === weekNum ? "Marking..." : "Mark All Solved"}
                           </button>
@@ -657,6 +724,157 @@ export default function PlanDetailPage() {
             })}
         </div>
       </main>
+
+      {celebrationWeek !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+          {/* Shower confetti — full screen falling pieces */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(40)].map((_, i) => {
+              const colors = ["#7c3aed","#2563eb","#10b981","#f59e0b","#ef4444","#ec4899","#06b6d4","#f97316"];
+              const shapes = ["50%", "2px", "0"];
+              return (
+                <div
+                  key={`shower-${i}`}
+                  className="confetti-shower-piece"
+                  style={{
+                    "--x": `${Math.random() * 100}%`,
+                    "--color": colors[i % colors.length],
+                    "--w": `${6 + Math.random() * 10}px`,
+                    "--h": `${6 + Math.random() * 10}px`,
+                    "--radius": shapes[i % shapes.length],
+                    "--duration": `${2 + Math.random() * 2}s`,
+                    "--delay": `${Math.random() * 0.8}s`,
+                  } as React.CSSProperties}
+                />
+              );
+            })}
+          </div>
+
+          {/* Burst confetti — centered explosion */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(30)].map((_, i) => {
+              const angle = (i / 30) * 360;
+              const distance = 80 + Math.random() * 180;
+              const tx = Math.cos((angle * Math.PI) / 180) * distance;
+              const ty = Math.sin((angle * Math.PI) / 180) * distance;
+              const colors = ["#7c3aed","#2563eb","#10b981","#f59e0b","#ef4444","#ec4899","#8b5cf6","#06b6d4"];
+              const sizes = ["50%", "30%", "10%"];
+              return (
+                <div
+                  key={`burst-${i}`}
+                  className="confetti-particle"
+                  style={{
+                    left: "50%",
+                    top: "40%",
+                    "--tx": `${tx}px`,
+                    "--ty": `${ty}px`,
+                    "--color": colors[i % colors.length],
+                    "--size": `${4 + Math.random() * 8}px`,
+                    "--radius": sizes[i % sizes.length],
+                    "--duration": `${1.5 + Math.random() * 1}s`,
+                    "--delay": `${Math.random() * 0.3}s`,
+                  } as React.CSSProperties}
+                />
+              );
+            })}
+          </div>
+
+          {/* Expanding rings behind modal */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="celebration-ring w-32 h-32" />
+            <div className="celebration-ring w-32 h-32" style={{ animationDelay: "0.5s" }} />
+            <div className="celebration-ring w-32 h-32" style={{ animationDelay: "1s" }} />
+          </div>
+
+          <div className="celebration-modal relative rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-strong)", boxShadow: "var(--shadow-lg)", animation: "glow-pulse 2s ease-in-out infinite, slide-up-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" }}>
+            <div className="celebration-emoji text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+              Week {celebrationWeek} Complete!
+            </h2>
+            <p className="mb-2" style={{ color: "var(--text-secondary)" }}>
+              You crushed every problem this week.
+            </p>
+            
+            {(() => {
+              const planAgeMs = Date.now() - new Date(plan.createdAt).getTime();
+              const planAgeDays = planAgeMs / (1000 * 60 * 60 * 24);
+              const expectedDays = celebrationWeek * 7;
+              const savedDays = Math.floor(expectedDays - planAgeDays);
+              
+              if (savedDays >= 2) {
+                return (
+                  <div className="mt-3 mb-4 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <p className="text-green-400 font-semibold text-sm">
+                      🚀 {savedDays} days ahead of schedule!
+                    </p>
+                    <p className="text-green-300/60 text-xs mt-1">
+                      At this pace, you'll finish your entire plan early.
+                    </p>
+                  </div>
+                );
+              } else if (savedDays >= 0) {
+                return (
+                  <div className="mt-3 mb-4 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <p className="text-blue-400 font-semibold text-sm">
+                      ⚡ Right on schedule — great consistency!
+                    </p>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="mt-3 mb-4 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                    <p className="text-violet-400 font-semibold text-sm">
+                      💪 Progress is progress — keep going!
+                    </p>
+                  </div>
+                );
+              }
+            })()}
+            
+            {celebrationWeek < plan.timelineWeeks ? (
+              <div className="space-y-2">
+                <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                  Week {celebrationWeek + 1} is ready for you
+                </p>
+                <button
+                  onClick={() => {
+                    setCelebrationWeek(null);
+                    setExpandedWeeks(new Set([celebrationWeek + 1]));
+                    setTimeout(() => {
+                      document.getElementById(`week-${celebrationWeek + 1}`)?.scrollIntoView({ 
+                        behavior: "smooth", block: "start" 
+                      });
+                    }, 100);
+                  }}
+                  className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold transition-colors"
+                >
+                  Start Week {celebrationWeek + 1} →
+                </button>
+                <button
+                  onClick={() => setCelebrationWeek(null)}
+                  className="w-full py-2 text-sm transition-colors"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="celebration-emoji text-4xl mb-2">🏆</div>
+                <p className="font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+                  You completed the entire plan!
+                </p>
+                <button
+                  onClick={() => setCelebrationWeek(null)}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-semibold"
+                >
+                  View Analytics →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

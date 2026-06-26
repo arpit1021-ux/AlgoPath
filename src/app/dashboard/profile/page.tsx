@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { User, Trophy, Target, Flame, CheckCircle2, RotateCcw, Lock } from "lucide-react";
 import { ProgressBar } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ export default async function ProfilePage() {
 
   const [totalSolved, totalRevisions, recentActivity, allPlans] = await Promise.all([
     db.planProblem.count({
-      where: { plan: { userId: user.id }, status: "SOLVED" },
+      where: { plan: { userId: user.id, deletedAt: null }, status: "SOLVED" },
     }),
     db.revision.count({
       where: { userId: user.id, status: "COMPLETED" },
@@ -50,9 +51,10 @@ export default async function ProfilePage() {
       take: 100,
     }),
     db.plan.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, deletedAt: null },
       select: {
         id: true,
+        slug: true,
         name: true,
         status: true,
         problems: {
@@ -133,11 +135,33 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-8 max-w-2xl">
-      <div>
-        <h1 className="text-3xl font-bold">Profile</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your account and view achievements.
-        </p>
+      {/* Hero section */}
+      <div className="flex items-center gap-6 p-6 rounded-2xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+        {clerkUser?.imageUrl ? (
+          <img
+            src={clerkUser.imageUrl}
+            alt="Profile"
+            className="w-20 h-20 rounded-full border-2"
+            style={{ borderColor: "var(--accent-border)" }}
+          />
+        ) : (
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center border-2" style={{ borderColor: "var(--accent-border)" }}>
+            <User className="h-10 w-10 text-white" />
+          </div>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+            {clerkUser?.firstName} {clerkUser?.lastName}
+          </h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+            {clerkUser?.emailAddresses?.[0]?.emailAddress}
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", color: "var(--accent-text)" }}>
+              Active Member
+            </span>
+          </div>
+        </div>
       </div>
 
       <Card className="glass-card border-border/50">
@@ -241,7 +265,12 @@ export default async function ProfilePage() {
               return (
                 <div key={plan.id} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{plan.name}</span>
+                    <Link
+                      href={`/dashboard/plans/${plan.slug}`}
+                      className="font-medium hover:text-primary transition-colors"
+                    >
+                      {plan.name}
+                    </Link>
                     <span className="text-xs text-muted-foreground">{solved}/{total} · {pct}%</span>
                   </div>
                   <ProgressBar value={pct} />

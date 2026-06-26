@@ -52,6 +52,8 @@ export default function NewPlanPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [planCreated, setPlanCreated] = useState(false);
 
   const [planName, setPlanName] = useState("");
   const [experienceLevel, setExperienceLevel] =
@@ -140,14 +142,24 @@ export default function NewPlanPage() {
         }),
       });
 
+      if (response.status === 429) {
+        const data = await response.json();
+        setError(data.message || "You've created too many plans today. Please try again tomorrow.");
+        setIsGenerating(false);
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
-        router.push(`/dashboard/plans/${data.plan.id}`);
+        setPlanCreated(true);
+        setTimeout(() => {
+          router.push(`/dashboard/plans/${data.plan.slug}`);
+        }, 1500);
       }
     } catch (error) {
       console.error("Failed to create plan:", error);
     } finally {
       setIsGenerating(false);
+      setError(null);
     }
   };
 
@@ -165,26 +177,29 @@ export default function NewPlanPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Create New Plan</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Create New Plan</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
           Set up your personalized interview preparation roadmap.
         </p>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+          ⚠️ {error}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground text-center">Step {currentStep} of {steps.length}</p>
-        <div className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 bg-white/5 rounded-2xl border border-white/10">
+        <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>Step {currentStep} of {steps.length}</p>
+        <div className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border)" }}>
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <div
-                className={cn(
-                  "flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all",
-                  currentStep === step.id
-                    ? "bg-violet-600 text-white"
-                    : currentStep > step.id
-                      ? "bg-white/10 text-white/70"
-                      : "text-white/30"
-                )}
+                className="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+                style={{
+                  background: currentStep === step.id ? "var(--accent)" : currentStep > step.id ? "var(--bg-input-hover)" : "transparent",
+                  color: currentStep === step.id ? "#ffffff" : currentStep > step.id ? "var(--text-secondary)" : "var(--text-muted)",
+                }}
               >
                 {currentStep > step.id ? (
                   <Check className="h-3.5 w-3.5" />
@@ -194,7 +209,7 @@ export default function NewPlanPage() {
                 <span className="hidden md:inline">{step.title}</span>
               </div>
               {index < steps.length - 1 && (
-                <div className="flex-1 h-px bg-white/10 min-w-[12px] max-w-[40px] mx-1" />
+                <div className="flex-1 h-px min-w-[12px] max-w-[40px] mx-1" style={{ background: "var(--border)" }} />
               )}
             </div>
           ))}
@@ -203,19 +218,19 @@ export default function NewPlanPage() {
 
       <AnimatedStep stepKey={currentStep}>
           {currentStep === 1 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <Brain className="h-5 w-5" />
                   What&apos;s your experience level?
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   This determines the difficulty distribution of your roadmap.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-medium mb-2 block" style={{ color: "var(--text-primary)" }}>
                     Plan Name
                   </label>
                   <Input
@@ -231,15 +246,14 @@ export default function NewPlanPage() {
                     <button
                       key={level}
                       onClick={() => setExperienceLevel(level)}
-                      className={cn(
-                        "p-4 rounded-lg border-2 text-left transition-all hover:border-primary cursor-pointer",
-                        experienceLevel === level
-                          ? "border-primary bg-primary/5"
-                          : "border-border"
-                      )}
+                      className="p-4 rounded-lg border-2 text-left transition-all hover:border-primary cursor-pointer"
+                      style={{
+                        borderColor: experienceLevel === level ? "var(--accent)" : "var(--border)",
+                        background: experienceLevel === level ? "var(--accent-dim)" : "var(--bg-card)",
+                      }}
                     >
-                      <div className="font-semibold capitalize">{level.toLowerCase()}</div>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <div className="font-semibold capitalize" style={{ color: "var(--text-primary)" }}>{level.toLowerCase()}</div>
+                      <div className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
                         {level === "BEGINNER" && "More easy problems, fundamentals first"}
                         {level === "INTERMEDIATE" && "Balanced mix of difficulties"}
                         {level === "EXPERT" && "Hard-heavy, advanced patterns"}
@@ -252,21 +266,21 @@ export default function NewPlanPage() {
           )}
 
           {currentStep === 2 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <Calendar className="h-5 w-5" />
                   Interview Timeline
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   How many weeks until your interview?
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Weeks</span>
-                    <span className="text-2xl font-bold">
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Weeks</span>
+                    <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
                       {timelineWeeks} weeks
                     </span>
                   </div>
@@ -276,24 +290,20 @@ export default function NewPlanPage() {
                     max={24}
                     value={timelineWeeks}
                     onChange={(e) => setTimelineWeeks(Number(e.target.value))}
-                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                    style={{ background: "var(--bg-input)" }}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                     <span>1 week</span>
-                    <span>12 weeks</span>
+                    <span style={{ color: "var(--accent-text)" }}>12 weeks</span>
                     <span>24 weeks</span>
                   </div>
                 </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm">
-                    <strong>{timelineWeeks} weeks</strong> gives you{" "}
-                    <strong>{timelineWeeks * weeklyHours} total hours</strong>{" "}
-                    of study time.{" "}
-                    {timelineWeeks <= 4
-                      ? "Consider extending if possible for better coverage."
-                      : timelineWeeks <= 12
-                        ? "A solid timeframe for focused preparation."
-                        : "Plenty of time for comprehensive coverage."}
+                <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks} weeks</strong> gives you{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks * weeklyHours} total hours</strong>{" "}
+                    of study time.
                   </p>
                 </div>
               </CardContent>
@@ -301,21 +311,21 @@ export default function NewPlanPage() {
           )}
 
           {currentStep === 3 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <Clock className="h-5 w-5" />
                   Weekly Study Hours
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   How many hours per week can you dedicate?
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Hours/Week</span>
-                    <span className="text-2xl font-bold">
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Hours/Week</span>
+                    <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
                       {weeklyHours} hours
                     </span>
                   </div>
@@ -325,21 +335,20 @@ export default function NewPlanPage() {
                     max={40}
                     value={weeklyHours}
                     onChange={(e) => setWeeklyHours(Number(e.target.value))}
-                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                    style={{ background: "var(--bg-input)" }}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                     <span>2 hours</span>
-                    <span>20 hours</span>
+                    <span style={{ color: "var(--accent-text)" }}>20 hours</span>
                     <span>40 hours</span>
                   </div>
                 </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm">
-                    At <strong>{weeklyHours} hours/week</strong> for{" "}
-                    <strong>{timelineWeeks} weeks</strong>, you&apos;ll have{" "}
-                    <strong>{timelineWeeks * weeklyHours} total hours</strong>{" "}
-                    = ~{Math.round((timelineWeeks * weeklyHours) / 35)} problems
-                    estimated.
+                <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    At <strong style={{ color: "var(--text-primary)" }}>{weeklyHours} hours/week</strong> for{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks} weeks</strong>, you&apos;ll have{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks * weeklyHours} total hours</strong>
                   </p>
                 </div>
               </CardContent>
@@ -347,19 +356,19 @@ export default function NewPlanPage() {
           )}
 
           {currentStep === 4 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <Building2 className="h-5 w-5" />
                   Target Companies
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   Select companies you&apos;re preparing for. Problems asked by
                   these companies will be prioritized.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                   Companies are ordered by priority. First selected = highest
                   priority.
                 </p>
@@ -379,7 +388,7 @@ export default function NewPlanPage() {
                   </div>
                 )}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--text-muted)" }} />
                   <Input
                     placeholder="Search companies (Google, TCS, Microsoft...)"
                     value={companySearch}
@@ -440,12 +449,12 @@ export default function NewPlanPage() {
                     <button
                       key={company.id}
                       onClick={() => toggleCompany(company.id)}
-                      className={cn(
-                        "p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer",
-                        selectedCompanies.includes(company.id)
-                          ? "border-primary bg-primary/5"
-                          : "border-border"
-                      )}
+                      className="p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer"
+                      style={{
+                        borderColor: selectedCompanies.includes(company.id) ? "var(--accent)" : "var(--border)",
+                        background: selectedCompanies.includes(company.id) ? "var(--accent-dim)" : "var(--bg-card)",
+                        color: "var(--text-primary)",
+                      }}
                     >
                       {company.name}
                     </button>
@@ -456,13 +465,13 @@ export default function NewPlanPage() {
           )}
 
           {currentStep === 5 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <BookOpen className="h-5 w-5" />
                   Topic Selection
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   Choose which topics to include in your roadmap.
                 </CardDescription>
               </CardHeader>
@@ -490,12 +499,12 @@ export default function NewPlanPage() {
                       <button
                         key={topic}
                         onClick={() => toggleTopic(topic)}
-                        className={cn(
-                          "p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer",
-                          selectedTopics.includes(topic)
-                            ? "border-primary bg-primary/5"
-                            : "border-border"
-                        )}
+                        className="p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer"
+                        style={{
+                          borderColor: selectedTopics.includes(topic) ? "var(--accent)" : "var(--border)",
+                          background: selectedTopics.includes(topic) ? "var(--accent-dim)" : "var(--bg-card)",
+                          color: "var(--text-primary)",
+                        }}
                       >
                         {topic}
                       </button>
@@ -503,11 +512,11 @@ export default function NewPlanPage() {
                   </div>
                 )}
                 {topicMode === "RECOMMENDED" && (
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm">
+                  <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                       <Sparkles className="h-4 w-4 inline mr-1" />
                       Based on your selected companies, we recommend:{" "}
-                      <strong>
+                      <strong style={{ color: "var(--text-primary)" }}>
                         Arrays, Trees, Graphs, Dynamic Programming, Hashing,
                         Binary Search
                       </strong>
@@ -515,8 +524,8 @@ export default function NewPlanPage() {
                   </div>
                 )}
                 {topicMode === "ALL" && (
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm">
+                  <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                       All {TOPICS.length} topics will be included in your
                       roadmap with balanced coverage.
                     </p>
@@ -527,13 +536,13 @@ export default function NewPlanPage() {
           )}
 
           {currentStep === 6 && (
-            <Card className="glass-card border-border/50">
+            <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
                   <Gauge className="h-5 w-5" />
                   Difficulty Preference
                 </CardTitle>
-                <CardDescription>
+                <CardDescription style={{ color: "var(--text-secondary)" }}>
                   Set your preferred starting difficulty level.
                 </CardDescription>
               </CardHeader>
@@ -551,22 +560,21 @@ export default function NewPlanPage() {
                     <button
                       key={diff}
                       onClick={() => setDifficultyPreference(diff)}
-                      className={cn(
-                        "p-4 rounded-lg border-2 text-center transition-all hover:border-primary cursor-pointer",
-                        difficultyPreference === diff
-                          ? "border-primary bg-primary/5"
-                          : "border-border"
-                      )}
+                      className="p-4 rounded-lg border-2 text-center transition-all hover:border-primary cursor-pointer"
+                      style={{
+                        borderColor: difficultyPreference === diff ? "var(--accent)" : "var(--border)",
+                        background: difficultyPreference === diff ? "var(--accent-dim)" : "var(--bg-card)",
+                      }}
                     >
-                      <div className="font-semibold text-sm">
+                      <div className="font-semibold text-sm" style={{ color: difficultyPreference === diff ? "var(--accent-text)" : "var(--text-primary)" }}>
                         {DIFFICULTY_LABELS[diff]}
                       </div>
                     </button>
                   ))}
                 </div>
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <p className="text-sm font-medium">Plan Summary</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                <div className="p-4 rounded-lg space-y-2" style={{ background: "var(--bg-input)" }}>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Plan Summary</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
                     <span>Experience: {experienceLevel.toLowerCase()}</span>
                     <span>Timeline: {timelineWeeks} weeks</span>
                     <span>Hours/week: {weeklyHours}h</span>
@@ -629,6 +637,14 @@ export default function NewPlanPage() {
           </Button>
         )}
       </div>
+
+      {planCreated && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+          <div className="text-5xl mb-2">🚀</div>
+          <p className="text-white font-bold text-xl">Your roadmap is ready!</p>
+          <p className="text-slate-400 text-sm">Redirecting you now...</p>
+        </div>
+      )}
     </div>
   );
 }

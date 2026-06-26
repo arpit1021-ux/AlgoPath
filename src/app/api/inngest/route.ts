@@ -7,7 +7,12 @@ const syncProblems = inngest.createFunction(
     const result = await step.run("fetch-and-store-problems", async () => {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/sync`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.CRON_SECRET || ""}`,
+          },
+        }
       );
       return response.json();
     });

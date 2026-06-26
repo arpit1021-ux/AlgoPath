@@ -84,24 +84,31 @@ const READINESS_ITEMS = [
 
 export default function AnalyticsPage() {
   const params = useParams();
-  const planId = params.planId as string;
+  const planSlug = params.planSlug as string;
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/analytics?planId=${planId}`)
+    fetch(`/api/analytics?planSlug=${planSlug}`)
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setAnalytics(data); })
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [planId]);
+  }, [planSlug]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground animate-pulse">Loading analytics...</div>
+      <div className="space-y-4 p-6 animate-pulse">
+        <div className="h-8 w-48 rounded-xl bg-white/5" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 rounded-xl bg-white/5" />
+          ))}
+        </div>
+        <div className="h-64 rounded-xl bg-white/5" />
+        <div className="h-64 rounded-xl bg-white/5" />
       </div>
     );
   }
@@ -110,7 +117,7 @@ export default function AnalyticsPage() {
     return (
       <div className="text-center py-16">
         <p className="text-muted-foreground mb-4">No analytics data available yet.</p>
-        <Link href={`/dashboard/plans/${planId}`}>
+        <Link href={`/dashboard/plans/${planSlug}`}>
           <Button>Back to Plan</Button>
         </Link>
       </div>
@@ -132,7 +139,7 @@ export default function AnalyticsPage() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href={`/dashboard/plans/${planId}`}>
+        <Link href={`/dashboard/plans/${planSlug}`}>
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Plan
@@ -148,7 +155,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 lg:grid-cols-3">
 
         {/* Readiness gauge */}
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-0">
             <CardTitle className="text-base">Interview Readiness</CardTitle>
             <CardDescription>Overall preparation score</CardDescription>
@@ -159,7 +166,7 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Score breakdown */}
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Score Breakdown</CardTitle>
             <CardDescription>What's driving your score</CardDescription>
@@ -191,7 +198,7 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Company scores */}
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Company Readiness</CardTitle>
             <CardDescription>Score per target company</CardDescription>
@@ -225,7 +232,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
-            label: "Problems Solved",
+            label: "Total Solved",
             value: `${totalSolved}/${totalProblems}`,
             sub: `${totalProblems > 0 ? Math.round((totalSolved / totalProblems) * 100) : 0}% complete`,
             icon: CheckCircle2,
@@ -233,28 +240,28 @@ export default function AnalyticsPage() {
             bg: "bg-green-500/10",
           },
           {
-            label: "Easy Solved",
+            label: "Easy",
             value: `${difficultyCompletion.EASY?.solved ?? 0}/${difficultyCompletion.EASY?.total ?? 0}`,
-            sub: "Easy problems",
+            sub: "problems",
             icon: Target,
             color: "text-green-400",
             bg: "bg-green-400/10",
           },
           {
-            label: "Medium Solved",
+            label: "Medium",
             value: `${difficultyCompletion.MEDIUM?.solved ?? 0}/${difficultyCompletion.MEDIUM?.total ?? 0}`,
-            sub: "Medium problems",
+            sub: "problems",
             icon: TrendingUp,
             color: "text-yellow-500",
             bg: "bg-yellow-500/10",
           },
           {
-            label: "Activity (30d)",
-            value: weeklyActivity,
-            sub: "Actions logged",
-            icon: Calendar,
-            color: "text-violet-500",
-            bg: "bg-violet-500/10",
+            label: "Hard",
+            value: `${difficultyCompletion.HARD?.solved ?? 0}/${difficultyCompletion.HARD?.total ?? 0}`,
+            sub: "problems",
+            icon: AlertTriangle,
+            color: "text-red-400",
+            bg: "bg-red-400/10",
           },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/50">
@@ -276,7 +283,7 @@ export default function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
 
         {/* Difficulty chart */}
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Difficulty Breakdown</CardTitle>
             <CardDescription>Assigned vs solved by difficulty</CardDescription>
@@ -287,7 +294,7 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Weak topics */}
-        <Card className="border-border/50">
+        <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-yellow-500" />

@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { z } from "zod";
+import { logError } from "@/lib/logger";
+
+async function resolvePlan(slugOrId: string, userId: string) {
+  const bySlug = await db.plan.findFirst({
+    where: { slug: slugOrId, userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (bySlug) return bySlug;
+  const byId = await db.plan.findFirst({
+    where: { id: slugOrId, userId, deletedAt: null },
+    select: { id: true },
+  });
+  return byId;
+}
 
 export async function GET(
   request: NextRequest,
@@ -18,12 +33,17 @@ export async function GET(
     }
 
     const { planId } = await params;
+    const resolved = await resolvePlan(planId, user.id);
+    if (!resolved) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
 
     const plan = await db.plan.findFirst({
-      where: { id: planId, userId: user.id },
+      where: { id: resolved.id, userId: user.id, deletedAt: null },
       select: {
         id: true,
         name: true,
+        slug: true,
         description: true,
         experienceLevel: true,
         timelineWeeks: true,
@@ -54,7 +74,6 @@ export async function GET(
                 likes: true,
                 url: true,
                 tags: { select: { name: true } },
-                // KEY FIX: only fetch top 3 companies, only name field
                 companies: {
                   take: 3,
                   select: { company: { select: { name: true } } },
@@ -63,7 +82,6 @@ export async function GET(
             },
             revisions: {
               select: { status: true, scheduledDate: true },
-              // KEY FIX: only fetch pending revisions
               where: { status: "PENDING" },
               take: 4,
             },
@@ -81,8 +99,12 @@ export async function GET(
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ plan });
+    return NextResponse.json(
+      { plan },
+      { headers: { "Cache-Control": "private, no-cache" } }
+    );
   } catch (error) {
+    logError(error, { route: "GET /api/plans/[planId]" });
     return NextResponse.json({ error: "Failed to fetch plan" }, { status: 500 });
   }
 }
@@ -103,15 +125,32 @@ export async function PATCH(
     }
 
     const { planId } = await params;
+    const resolved = await resolvePlan(planId, user.id);
+    if (!resolved) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
+
     const body = await request.json();
 
+    const UpdatePlanSchema = z.object({
+      name: z.string().min(1).max(100).optional(),
+      description: z.string().max(500).optional(),
+      status: z.enum(["ACTIVE", "PAUSED", "COMPLETED"]).optional(),
+    }).strict();
+
+    const parsed = UpdatePlanSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+
     const plan = await db.plan.update({
-      where: { id: planId, userId: user.id },
-      data: body,
+      where: { id: resolved.id },
+      data: parsed.data,
     });
 
     return NextResponse.json({ plan });
   } catch (error) {
+    logError(error, { route: "PATCH /api/plans/[planId]" });
     return NextResponse.json({ error: "Failed to update plan" }, { status: 500 });
   }
 }
@@ -132,10 +171,19 @@ export async function DELETE(
     }
 
     const { planId } = await params;
-    await db.plan.delete({ where: { id: planId, userId: user.id } });
+    const resolved = await resolvePlan(planId, user.id);
+    if (!resolved) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
+
+    await db.plan.update({
+      where: { id: resolved.id },
+      data: { deletedAt: new Date() },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    logError(error, { route: "DELETE /api/plans/[planId]" });
     return NextResponse.json({ error: "Failed to delete plan" }, { status: 500 });
   }
 }

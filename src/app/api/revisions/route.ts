@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import {
-  getTodaysRevisions,
-  getOverdueRevisions,
-  completeRevision,
-} from "@/lib/revision-engine";
+import { z } from "zod";
+import { revisionLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
+import { getTodaysRevisions, getOverdueRevisions, completeRevision } from "@/lib/revision-engine";
+
+const RevisionSchema = z.object({
+  revisionId: z.string().min(1),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +23,16 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const planId = searchParams.get("planId");
+    const planParam = searchParams.get("planId") || searchParams.get("planSlug");
+
+    let resolvedPlanId: string | null = null;
+    if (planParam) {
+      const plan = await db.plan.findFirst({
+        where: { OR: [{ id: planParam }, { slug: planParam }], userId: user.id, deletedAt: null },
+        select: { id: true },
+      });
+      resolvedPlanId = plan?.id ?? null;
+    }
 
     const [todayRevisions, overdueRevisions] = await Promise.all([
       getTodaysRevisions(user.id),
@@ -30,24 +42,15 @@ export async function GET(request: NextRequest) {
     let filteredToday = todayRevisions;
     let filteredOverdue = overdueRevisions;
 
-    if (planId) {
-      filteredToday = todayRevisions.filter(
-        (r) => r.planProblem.planId === planId
-      );
-      filteredOverdue = overdueRevisions.filter(
-        (r) => r.planProblem.planId === planId
-      );
+    if (resolvedPlanId) {
+      filteredToday = todayRevisions.filter((r) => r.planProblem.planId === resolvedPlanId);
+      filteredOverdue = overdueRevisions.filter((r) => r.planProblem.planId === resolvedPlanId);
     }
 
-    return NextResponse.json({
-      today: filteredToday,
-      overdue: filteredOverdue,
-    });
+    return NextResponse.json({ today: filteredToday, overdue: filteredOverdue });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch revisions" },
-      { status: 500 }
-    );
+    logError(error, { route: "GET /api/revisions" });
+    return NextResponse.json({ error: "Failed to fetch revisions" }, { status: 500 });
   }
 }
 
@@ -58,23 +61,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { blocked, response } = await checkRateLimit(revisionLimiter, `user_${clerkId}`);
+    if (blocked) {
+      return NextResponse.json(
+        { error: "Too many requests", message: JSON.parse(await response!.text()).message },
+        { status: 429 }
+      );
+    }
+
     const user = await db.user.findUnique({ where: { clerkId } });
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const body = await request.json();
-    const { revisionId } = body;
+    const parsed = RevisionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const { revisionId } = parsed.data;
 
-    const revision = await db.revision.findUnique({
-      where: { id: revisionId },
+    const revision = await db.revision.findFirst({
+      where: { id: revisionId, userId: user.id },
     });
 
-    if (!revision || revision.userId !== user.id) {
-      return NextResponse.json(
-        { error: "Revision not found" },
-        { status: 404 }
-      );
+    if (!revision) {
+      return NextResponse.json({ error: "Revision not found" }, { status: 404 });
     }
 
     const completed = await completeRevision(revisionId);
@@ -89,19 +104,14 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           planId: planProblem.planId,
           action: "revision_completed",
-          details: {
-            revisionId,
-            revisionNumber: completed.revisionNumber,
-          },
+          details: { revisionId, revisionNumber: completed.revisionNumber },
         },
       });
     }
 
     return NextResponse.json({ revision: completed });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to complete revision" },
-      { status: 500 }
-    );
+    logError(error, { route: "POST /api/revisions" });
+    return NextResponse.json({ error: "Failed to complete revision" }, { status: 500 });
   }
 }
