@@ -50,7 +50,7 @@ async function ensureProblemsSeeded() {
         });
       })
     );
-    const tagMap = new Map(tagRecords.map((t) => [t.name, t.id]));
+    const tagMap = new Map(tagRecords.map((t: { name: string; id: string }) => [t.name, t.id]));
     console.log(`Upserted ${tagRecords.length} tags.`);
 
     // Batch upsert all companies
