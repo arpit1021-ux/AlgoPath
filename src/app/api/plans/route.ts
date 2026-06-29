@@ -50,7 +50,7 @@ async function ensureProblemsSeeded() {
         });
       })
     );
-    const tagMap = new Map(tagRecords.map((t: { name: string; id: string }) => [t.name, t.id]));
+    const tagMap = new Map<string, string>(tagRecords.map((t: { name: string; id: string }) => [t.name, t.id]));
     console.log(`Upserted ${tagRecords.length} tags.`);
 
     // Batch upsert all companies
@@ -68,7 +68,7 @@ async function ensureProblemsSeeded() {
         });
       })
     );
-    const companyMap = new Map(companyRecords.map((c: { name: string; id: string }) => [c.name, c.id]));
+    const companyMap = new Map<string, string>(companyRecords.map((c: { name: string; id: string }) => [c.name, c.id]));
     console.log(`Upserted ${companyRecords.length} companies.`);
 
     // Batch create all problems
@@ -96,7 +96,7 @@ async function ensureProblemsSeeded() {
     const createdProblems = await db.problem.findMany({
       select: { id: true, titleSlug: true },
     });
-    const problemIdMap = new Map(createdProblems.map((p: { titleSlug: string; id: string }) => [p.titleSlug, p.id]));
+    const problemIdMap = new Map<string, string>(createdProblems.map((p: { titleSlug: string; id: string }) => [p.titleSlug, p.id]));
 
     // Batch create tag connections
     const tagConnections: { problemId: string; tagId: string }[] = [];
