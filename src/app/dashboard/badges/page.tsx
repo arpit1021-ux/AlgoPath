@@ -37,7 +37,7 @@ export default async function BadgesPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const activityDates = new Set(
-    recentActivity.map((a) => {
+    recentActivity.map((a: { createdAt: Date }) => {
       const d = new Date(a.createdAt);
       d.setHours(0, 0, 0, 0);
       return d.getTime();
