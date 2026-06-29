@@ -53,7 +53,7 @@ export default async function BadgesPage() {
     }
   }
 
-  const totalProblemsInPlans = allPlans.reduce((sum, p) => sum + p.problems.length, 0);
+  const totalProblemsInPlans = allPlans.reduce((sum: number, p) => sum + p.problems.length, 0);
 
   const badges = [
     {
