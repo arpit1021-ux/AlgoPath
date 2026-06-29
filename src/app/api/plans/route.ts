@@ -68,7 +68,7 @@ async function ensureProblemsSeeded() {
         });
       })
     );
-    const companyMap = new Map(companyRecords.map((c) => [c.name, c.id]));
+    const companyMap = new Map(companyRecords.map((c: { name: string; id: string }) => [c.name, c.id]));
     console.log(`Upserted ${companyRecords.length} companies.`);
 
     // Batch create all problems
@@ -96,7 +96,7 @@ async function ensureProblemsSeeded() {
     const createdProblems = await db.problem.findMany({
       select: { id: true, titleSlug: true },
     });
-    const problemIdMap = new Map(createdProblems.map((p) => [p.titleSlug, p.id]));
+    const problemIdMap = new Map(createdProblems.map((p: { titleSlug: string; id: string }) => [p.titleSlug, p.id]));
 
     // Batch create tag connections
     const tagConnections: { problemId: string; tagId: string }[] = [];
