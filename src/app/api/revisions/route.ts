@@ -43,8 +43,8 @@ export async function GET(request: NextRequest) {
     let filteredOverdue = overdueRevisions;
 
     if (resolvedPlanId) {
-      filteredToday = todayRevisions.filter((r) => r.planProblem.planId === resolvedPlanId);
-      filteredOverdue = overdueRevisions.filter((r) => r.planProblem.planId === resolvedPlanId);
+      filteredToday = todayRevisions.filter((r: typeof todayRevisions[0]) => r.planProblem.planId === resolvedPlanId);
+      filteredOverdue = overdueRevisions.filter((r: typeof overdueRevisions[0]) => r.planProblem.planId === resolvedPlanId);
     }
 
     return NextResponse.json({ today: filteredToday, overdue: filteredOverdue });
