@@ -294,3 +294,11 @@ input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius
 
 /* Ensure bg-card Tailwind class resolves correctly */
 .bg-card { background-color: var(--bg-card) !important; }
+
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.loading-bg-pulse {
+  animation: subtle-pulse 3s ease-in-out infinite;
+}

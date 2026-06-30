@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,105 @@ const AnimatedStep = dynamic(
   () => import("@/components/wizard/animated-step").then((m) => m.AnimatedStep),
   { ssr: false }
 );
+
+function LoadingExperience({ difficulty }: { difficulty: string }) {
+  const [stageIndex, setStageIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+
+  const stages = [
+    { icon: "🔍", text: "Analyzing your target companies..." },
+    { icon: "📊", text: "Scanning 914 curated problems..." },
+    { icon: "⚖️", text: "Balancing topics across weeks..." },
+    { icon: "🎯", text: "Weighting by company frequency..." },
+    { icon: "📅", text: "Building your week-by-week schedule..." },
+    { icon: "✨", text: "Almost there — finalizing your roadmap..." },
+  ];
+
+  const difficultyMessages: Record<string, string> = {
+    VERY_EASY: "Starting you off easy — building confidence first.",
+    EASY: "Keeping it approachable while you build momentum.",
+    MEDIUM: "Balancing challenge with steady progress.",
+    HARD: "You picked Hard — give us a moment to curate the toughest problems.",
+    VERY_HARD: "Maximum difficulty selected. This takes a bit longer to get right.",
+  };
+
+  useEffect(() => {
+    const stageInterval = setInterval(() => {
+      setStageIndex((prev) => Math.min(prev + 1, stages.length - 1));
+    }, 2200);
+
+    const elapsedInterval = setInterval(() => {
+      setElapsed((prev) => prev + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(stageInterval);
+      clearInterval(elapsedInterval);
+    };
+  }, []);
+
+  const isTakingLong = elapsed > 12;
+  const isHardDifficulty = difficulty === "HARD" || difficulty === "VERY_HARD";
+
+  return (
+    <div className="max-w-md w-full mx-4 text-center relative">
+      <div
+        className="absolute inset-0 loading-bg-pulse"
+        style={{
+          background: 'radial-gradient(circle at center, rgba(99,102,241,0.1), transparent 70%)',
+        }}
+      />
+      <div className="relative w-20 h-20 mx-auto mb-6">
+        <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center text-3xl">
+          {stages[stageIndex].icon}
+        </div>
+      </div>
+
+      <p
+        key={stageIndex}
+        className="text-white font-semibold text-lg mb-2 animate-in fade-in duration-300"
+      >
+        {stages[stageIndex].text}
+      </p>
+
+      {isHardDifficulty && (
+        <p className="text-indigo-300/70 text-sm mb-4">
+          {difficultyMessages[difficulty]}
+        </p>
+      )}
+
+      <div className="flex items-center justify-center gap-1.5 mb-6">
+        {stages.map((_, i) => (
+          <div
+            key={i}
+            className="h-1.5 rounded-full transition-all duration-300"
+            style={{
+              width: i === stageIndex ? '24px' : '6px',
+              background: i <= stageIndex
+                ? 'var(--accent, #6366f1)'
+                : 'rgba(255,255,255,0.15)',
+            }}
+          />
+        ))}
+      </div>
+
+      {isTakingLong && (
+        <div className="px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-slate-400 text-xs">
+            This is taking a bit longer than usual — we&apos;re making sure your
+            roadmap is perfectly tailored. Hang tight!
+          </p>
+        </div>
+      )}
+
+      <p className="text-slate-600 text-xs mt-4">
+        {elapsed}s elapsed
+      </p>
+    </div>
+  );
+}
 
 const steps = [
   { id: 1, title: "Experience", icon: Brain },
@@ -637,6 +736,14 @@ export default function NewPlanPage() {
           </Button>
         )}
       </div>
+
+      {isGenerating && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md"
+          style={{ background: 'rgba(0,0,0,0.85)' }}
+        >
+          <LoadingExperience difficulty={difficultyPreference} />
+        </div>
+      )}
 
       {planCreated && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
