@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
 
     let slug = generatePlanSlug(name);
     const existing = await db.plan.findFirst({
-      where: { userId: user.id, slug, deletedAt: null },
+      where: { userId: user.id, slug },
       select: { id: true },
     });
     if (existing) {
