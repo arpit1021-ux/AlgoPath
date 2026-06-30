@@ -253,12 +253,17 @@ export default function NewPlanPage() {
         setTimeout(() => {
           router.push(`/dashboard/plans/${data.plan.slug}`);
         }, 1500);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Failed to create plan. Please try again.");
+        setIsGenerating(false);
+        return;
       }
     } catch (error) {
       console.error("Failed to create plan:", error);
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsGenerating(false);
-      setError(null);
     }
   };
 
