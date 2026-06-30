@@ -232,14 +232,21 @@ export async function generateRoadmap(
       }
     }
 
-    // Redistribute leftover minutes to other available pools
-    if (remainingMinutes > 0) {
+    // When a pool runs out, redistribute its unused budget to other pools
+    // but cap so we don't exceed the expected problems-per-week count
+    const expectedMaxPerWeek = Math.floor(budgets.EASY / timeMap.EASY)
+      + Math.floor(budgets.MEDIUM / timeMap.MEDIUM)
+      + Math.floor(budgets.HARD / timeMap.HARD);
+
+    if (remainingMinutes > 0 && weekProblems.length < expectedMaxPerWeek) {
       for (const diff of ["MEDIUM", "EASY", "HARD"] as const) {
+        if (weekProblems.length >= expectedMaxPerWeek) break;
         const timePerProblem = timeMap[diff];
         const pool = byDiff[diff];
 
         while (
           remainingMinutes >= timePerProblem &&
+          weekProblems.length < expectedMaxPerWeek &&
           usedIdx[diff] < pool.length
         ) {
           const problem = pool[usedIdx[diff]];
