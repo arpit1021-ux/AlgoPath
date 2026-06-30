@@ -715,7 +715,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12" style={{ borderTop: "1px solid var(--border)" }}>
+      <footer className="py-12 relative" style={{ borderTop: "1px solid var(--border)", zIndex: 10 }}>
         <div className="max-w-7xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center">
