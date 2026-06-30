@@ -75,7 +75,7 @@ function LoadingExperience({ difficulty }: { difficulty: string }) {
     };
   }, []);
 
-  const isTakingLong = elapsed > 12;
+  const isTakingLong = elapsed > 40;
   const isHardDifficulty = difficulty === "HARD" || difficulty === "VERY_HARD";
 
   return (
