@@ -147,12 +147,53 @@ export default function PlanRoadmapPage() {
 
   const [markingAll, setMarkingAll] = useState<number | null>(null);
   const markAllSolved = async (weekProblems: PlanProblem[]) => {
-    setMarkingAll(weekProblems[0]?.weekNumber ?? null);
+    const weekNum = weekProblems[0]?.weekNumber ?? null;
+    if (weekNum === null) return;
     const unsolved = weekProblems.filter((p) => p.status !== "SOLVED");
-    for (const pp of unsolved) {
-      await updateProblemStatus(pp.id, "SOLVED", pp.weekNumber);
+    if (unsolved.length === 0) return;
+
+    setMarkingAll(weekNum);
+
+    const idsToUpdate = new Set(unsolved.map((p) => p.id));
+    setPlan((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        problems: prev.problems.map((p) =>
+          idsToUpdate.has(p.id) ? { ...p, status: "SOLVED" } : p
+        ),
+      };
+    });
+
+    setTimeout(() => setCelebrationWeek(weekNum), 300);
+
+    try {
+      const planId = plan!.id;
+      const res = await fetch(`/api/plans/${planId}/problems/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planProblemIds: Array.from(idsToUpdate),
+          status: "SOLVED",
+        }),
+      });
+
+      if (!res.ok) {
+        fetch(`/api/plans/${planSlug}`)
+          .then((r) => r.json())
+          .then((d) => setPlan(d.plan));
+        showToast({ type: "error", message: "Failed to mark all as solved." });
+      } else {
+        showToast({ type: "success", message: `${unsolved.length} problems marked solved!` });
+      }
+    } catch {
+      fetch(`/api/plans/${planSlug}`)
+        .then((r) => r.json())
+        .then((d) => setPlan(d.plan));
+      showToast({ type: "error", message: "Something went wrong." });
+    } finally {
+      setMarkingAll(null);
     }
-    setMarkingAll(null);
   };
 
   const saveNote = async (planProblemId: string, content: string) => {

@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -195,7 +196,7 @@ export default function HomePage() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>Features</a>
             <a href="#how-it-works" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>How It Works</a>
-            <a href="#pricing" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>Pricing</a>
+            <button onClick={() => setPricingModalOpen(true)} className="text-sm transition-colors cursor-pointer" style={{ color: "var(--text-secondary)" }}>Pricing</button>
           </div>
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
@@ -210,7 +211,7 @@ export default function HomePage() {
           <div className="md:hidden px-6 py-4 space-y-3" style={{ background: "var(--navbar-bg)", borderTop: "1px solid var(--border)", backdropFilter: "blur(16px)" }}>
             <a href="#features" className="block text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>Features</a>
             <a href="#how-it-works" className="block text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>How It Works</a>
-            <a href="#pricing" className="block text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>Pricing</a>
+            <button onClick={() => { setMobileOpen(false); setPricingModalOpen(true); }} className="block text-sm text-left cursor-pointer" style={{ color: "var(--text-secondary)" }}>Pricing</button>
             <div className="pt-2 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)" }}>
               <Link href="/login" className="text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>Sign In</Link>
               <Link href="/register" className="text-sm font-semibold text-white px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#7c3aed] to-[#2563eb] text-center" onClick={() => setMobileOpen(false)}>Get Started</Link>
@@ -725,13 +726,41 @@ export default function HomePage() {
           <div className="flex items-center gap-6 text-sm" style={{ color: "var(--text-secondary)" }}>
             <a href="#features" className="transition-colors" style={{ color: "inherit" }}>Features</a>
             <a href="#how-it-works" className="transition-colors" style={{ color: "inherit" }}>How It Works</a>
-            <a href="https://github.com/arpit1021-ux" target="_blank" rel="noopener noreferrer" className="transition-colors" style={{ color: "inherit" }}>GitHub</a>
+            <a href="https://github.com/arpit1021-ux/AlgoPath" target="_blank" rel="noopener noreferrer" className="transition-colors" style={{ color: "inherit" }}>GitHub</a>
           </div>
           <div className="text-xs" style={{ color: "var(--text-muted)" }}>
             &copy; {new Date().getFullYear()} AlgoPath. All rights reserved.
           </div>
         </div>
       </footer>
+
+      {pricingModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setPricingModalOpen(false)}
+        >
+          <div
+            className="rounded-2xl p-8 max-w-sm w-full mx-4 text-center"
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-4xl mb-3">🎉</div>
+            <h3 className="text-xl font-bold text-white mb-2">100% Free</h3>
+            <p className="text-slate-400 text-sm mb-4">
+              AlgoPath is free forever during our beta. No credit card,
+              no hidden fees, no premium tiers.
+            </p>
+            <button
+              onClick={() => setPricingModalOpen(false)}
+              className="px-6 py-2 rounded-lg text-white text-sm font-semibold cursor-pointer"
+              style={{ background: 'var(--accent)' }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

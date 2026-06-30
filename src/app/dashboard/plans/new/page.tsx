@@ -288,7 +288,7 @@ export default function NewPlanPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div className={cn("flex flex-col gap-2", isGenerating && "pointer-events-none select-none")}>
         <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>Step {currentStep} of {steps.length}</p>
         <div className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border)" }}>
           {steps.map((step, index) => (
@@ -315,6 +315,7 @@ export default function NewPlanPage() {
         </div>
       </div>
 
+      <div className={cn("space-y-8", isGenerating && "pointer-events-none select-none opacity-60")}>
       <AnimatedStep stepKey={currentStep}>
           {currentStep === 1 && (
             <Card className="glass-card">
@@ -735,6 +736,7 @@ export default function NewPlanPage() {
             )}
           </Button>
         )}
+      </div>
       </div>
 
       {isGenerating && (
