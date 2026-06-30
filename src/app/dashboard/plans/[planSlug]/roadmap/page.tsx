@@ -19,6 +19,9 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Target,
+  TrendingUp,
+  Play,
 } from "lucide-react";
 
 interface PlanProblem {
@@ -63,6 +66,41 @@ const DIFF_COLORS: Record<string, string> = {
   HARD:   "bg-red-100 text-red-700 border-red-200",
 };
 
+function CollapsibleSidebarSection({
+  title,
+  icon,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg overflow-hidden" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-white/5 cursor-pointer"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <div className="flex items-center gap-1.5">
+          {icon}
+          <span>{title}</span>
+        </div>
+        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      </button>
+      {isOpen && (
+        <div className="px-2 pb-2.5">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PlanRoadmapPage() {
   const params = useParams();
   const planSlug = params.planSlug as string;
@@ -71,6 +109,16 @@ export default function PlanRoadmapPage() {
   const [loading, setLoading] = useState(true);
   const [activeTopicFilter, setActiveTopicFilter] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarSections, setSidebarSections] = useState<Record<string, boolean>>({
+    progress: true,
+    details: true,
+    pool: true,
+    companies: true,
+    nav: true,
+  });
+  const toggleSidebarSection = (key: string) => {
+    setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   const [celebrationWeek, setCelebrationWeek] = useState<number | null>(null);
@@ -241,6 +289,7 @@ export default function PlanRoadmapPage() {
 
   const totalProblems = plan.problems.length;
   const solvedProblems = plan.problems.filter((p) => p.status === "SOLVED").length;
+  const attemptedProblems = plan.problems.filter((p) => p.status === "ATTEMPTED").length;
   const completionRate = totalProblems > 0 ? Math.round((solvedProblems / totalProblems) * 100) : 0;
 
   const currentWeek = Math.min(
@@ -310,138 +359,157 @@ export default function PlanRoadmapPage() {
         style={{
           background: "var(--sidebar-bg)",
           borderRight: "1px solid var(--sidebar-border)",
-          width: sidebarOpen ? undefined : 56,
-          padding: sidebarOpen ? 20 : 8,
-          gap: sidebarOpen ? 24 : 16,
+          width: sidebarOpen ? 280 : 52,
+          padding: sidebarOpen ? "16px 14px" : "12px 8px",
         }}
       >
+        {/* Master toggle */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="hidden lg:flex w-full items-center justify-center p-1.5 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center p-1.5 rounded-lg transition-colors mb-3 shrink-0"
           style={{ color: "var(--text-muted)" }}
           onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-input-hover)"}
           onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
-          {sidebarOpen ? (
-            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
+          {sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
 
-        <div>
-          {sidebarOpen ? (
-            <>
-              <div className="flex items-center gap-2 mb-1">
-                <Link href={`/dashboard/plans/${planSlug}`} className="text-lg font-bold truncate whitespace-nowrap hover:text-primary transition-colors">
-                  {plan.name}
-                </Link>
-                <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs shrink-0">
+        {!sidebarOpen ? (
+          /* Collapsed: icon-only nav */
+          <div className="flex flex-col items-center gap-3">
+            <Link href={`/dashboard/plans/${planSlug}`} title={plan.name}>
+              <BarChart3 className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+            </Link>
+            <div className="w-6 h-px" style={{ background: "var(--sidebar-border)" }} />
+            <span className="text-[10px] font-bold" style={{ color: "var(--text-muted)" }}>{completionRate}%</span>
+            <div className="w-1 h-1 rounded-full bg-green-500" />
+          </div>
+        ) : (
+          /* Expanded: full sidebar with collapsible sections */
+          <div className="flex flex-col gap-1 flex-1 min-h-0">
+            {/* Plan header */}
+            <div className="pb-2 shrink-0" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+              <Link href={`/dashboard/plans/${planSlug}`} className="text-sm font-bold truncate whitespace-nowrap hover:opacity-80 transition-opacity block" style={{ color: "var(--text-primary)" }}>
+                {plan.name}
+              </Link>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                   {plan.status}
                 </Badge>
+                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                  Week {currentWeek}/{plan.timelineWeeks}
+                </span>
               </div>
-              {plan.description && (
-                <p className="text-xs text-muted-foreground">{plan.description}</p>
-              )}
-            </>
-          ) : (
-            <div className="flex justify-center">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </div>
-          )}
-        </div>
 
-        {sidebarOpen && (
-          <div className="space-y-2 hidden lg:block">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium">Progress</span>
-              <span className="text-muted-foreground">{solvedProblems}/{totalProblems}</span>
-            </div>
-            <Progress value={completionRate} className="h-2" />
-            <p className="text-xs text-muted-foreground">{completionRate}% complete</p>
-            <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              Week {currentWeek} of {plan.timelineWeeks}
-            </div>
-          </div>
-        )}
-
-        {sidebarOpen && (
-          <div className="space-y-3 text-sm hidden lg:block">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Duration</span>
-              <span className="font-medium">{plan.timelineWeeks} weeks</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Weekly hours</span>
-              <span className="font-medium">{plan.weeklyHours}h</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Level</span>
-              <span className="font-medium capitalize">{plan.experienceLevel.toLowerCase()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Difficulty</span>
-              <span className="font-medium capitalize">
-                {plan.difficultyPreference.replace(/_/g, " ").toLowerCase()}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {sidebarOpen && (
-          <div className="space-y-2 hidden lg:block">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Problem Pool
-            </p>
-            <div className="space-y-1.5">
-              {(["EASY", "MEDIUM", "HARD"] as const).map((d) => (
-                <div key={d} className="flex items-center justify-between text-xs">
-                  <span className={cn("px-2 py-0.5 rounded-full border font-medium", DIFF_COLORS[d])}>
-                    {d.charAt(0) + d.slice(1).toLowerCase()}
-                  </span>
-                  <span className="text-muted-foreground">{diffCounts[d]}</span>
+            <div className="flex-1 overflow-y-auto space-y-0.5 py-1">
+              {/* Progress section */}
+              <CollapsibleSidebarSection
+                title="Progress"
+                icon={<TrendingUp className="h-3.5 w-3.5" />}
+                isOpen={sidebarSections.progress}
+                onToggle={() => toggleSidebarSection("progress")}
+              >
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span style={{ color: "var(--text-secondary)" }}>{solvedProblems}/{totalProblems} solved</span>
+                    <span className="font-semibold" style={{ color: "var(--accent-text)" }}>{completionRate}%</span>
+                  </div>
+                  <Progress value={completionRate} className="h-1.5" />
+                  <div className="flex gap-3 text-[10px]" style={{ color: "var(--text-muted)" }}>
+                    <span>{attemptedProblems} attempted</span>
+                    <span>{totalProblems - solvedProblems - attemptedProblems} remaining</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </CollapsibleSidebarSection>
 
-        {sidebarOpen && plan.targetCompanies.length > 0 && (
-          <div className="space-y-2 hidden lg:block">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Companies
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {plan.targetCompanies.map((tc) => (
-                <Badge key={tc.company.slug} variant="secondary" className="text-xs">
-                  {tc.company.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
+              {/* Details section */}
+              <CollapsibleSidebarSection
+                title="Details"
+                icon={<Clock className="h-3.5 w-3.5" />}
+                isOpen={sidebarSections.details}
+                onToggle={() => toggleSidebarSection("details")}
+              >
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--text-muted)" }}>Duration</span>
+                    <span className="font-medium" style={{ color: "var(--text-primary)" }}>{plan.timelineWeeks} weeks</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--text-muted)" }}>Hours/week</span>
+                    <span className="font-medium" style={{ color: "var(--text-primary)" }}>{plan.weeklyHours}h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--text-muted)" }}>Level</span>
+                    <span className="font-medium capitalize" style={{ color: "var(--text-primary)" }}>{plan.experienceLevel.toLowerCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--text-muted)" }}>Difficulty</span>
+                    <span className="font-medium capitalize" style={{ color: "var(--text-primary)" }}>
+                      {plan.difficultyPreference.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                  </div>
+                </div>
+              </CollapsibleSidebarSection>
 
-        {sidebarOpen && (
-          <div className="space-y-2 pt-2 hidden lg:block">
-            <Link href={`/dashboard/plans/${planSlug}`} className="block">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
-            </Link>
-            <Link href={`/dashboard/plans/${planSlug}/analytics`} className="block">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Analytics
-              </Button>
-            </Link>
-            <Link href={`/dashboard/plans/${planSlug}/revisions`} className="block">
-              <Button variant="outline" size="sm" className="w-full justify-start">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Revisions
-              </Button>
-            </Link>
+              {/* Problem Pool section */}
+              <CollapsibleSidebarSection
+                title="Problem Pool"
+                icon={<Target className="h-3.5 w-3.5" />}
+                isOpen={sidebarSections.pool}
+                onToggle={() => toggleSidebarSection("pool")}
+              >
+                <div className="space-y-1.5">
+                  {(["EASY", "MEDIUM", "HARD"] as const).map((d) => (
+                    <div key={d} className="flex items-center justify-between text-xs">
+                      <span className={cn("px-2 py-0.5 rounded-full border font-medium", DIFF_COLORS[d])}>
+                        {d.charAt(0) + d.slice(1).toLowerCase()}
+                      </span>
+                      <span style={{ color: "var(--text-muted)" }}>{diffCounts[d]}</span>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleSidebarSection>
+
+              {/* Companies section */}
+              {plan.targetCompanies.length > 0 && (
+                <CollapsibleSidebarSection
+                  title="Companies"
+                  icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                  isOpen={sidebarSections.companies}
+                  onToggle={() => toggleSidebarSection("companies")}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {plan.targetCompanies.map((tc) => (
+                      <Badge key={tc.company.slug} variant="secondary" className="text-[10px]">
+                        {tc.company.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </CollapsibleSidebarSection>
+              )}
+
+              {/* Nav links section */}
+              <CollapsibleSidebarSection
+                title="Navigate"
+                icon={<Play className="h-3.5 w-3.5" />}
+                isOpen={sidebarSections.nav}
+                onToggle={() => toggleSidebarSection("nav")}
+              >
+                <div className="space-y-1">
+                  <Link href={`/dashboard/plans/${planSlug}`} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md transition-colors hover:bg-white/5" style={{ color: "var(--text-secondary)" }}>
+                    <BarChart3 className="h-3 w-3" /> Dashboard
+                  </Link>
+                  <Link href={`/dashboard/plans/${planSlug}/analytics`} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md transition-colors hover:bg-white/5" style={{ color: "var(--text-secondary)" }}>
+                    <BarChart3 className="h-3 w-3" /> Analytics
+                  </Link>
+                  <Link href={`/dashboard/plans/${planSlug}/revisions`} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md transition-colors hover:bg-white/5" style={{ color: "var(--text-secondary)" }}>
+                    <RotateCcw className="h-3 w-3" /> Revisions
+                  </Link>
+                </div>
+              </CollapsibleSidebarSection>
+            </div>
           </div>
         )}
       </aside>
