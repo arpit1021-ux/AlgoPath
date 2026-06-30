@@ -232,45 +232,6 @@ export async function generateRoadmap(
       }
     }
 
-    // When a pool runs out, redistribute its unused budget to other pools
-    // but cap so we don't exceed the expected problems-per-week count
-    const expectedMaxPerWeek = Math.floor(budgets.EASY / timeMap.EASY)
-      + Math.floor(budgets.MEDIUM / timeMap.MEDIUM)
-      + Math.floor(budgets.HARD / timeMap.HARD);
-
-    if (remainingMinutes > 0 && weekProblems.length < expectedMaxPerWeek) {
-      for (const diff of ["MEDIUM", "EASY", "HARD"] as const) {
-        if (weekProblems.length >= expectedMaxPerWeek) break;
-        const timePerProblem = timeMap[diff];
-        const pool = byDiff[diff];
-
-        while (
-          remainingMinutes >= timePerProblem &&
-          weekProblems.length < expectedMaxPerWeek &&
-          usedIdx[diff] < pool.length
-        ) {
-          const problem = pool[usedIdx[diff]];
-          usedIdx[diff]++;
-
-          weekProblems.push({
-            problemId: problem.id,
-            title: problem.title,
-            titleSlug: problem.titleSlug,
-            difficulty: problem.difficulty,
-            acceptanceRate: problem.acceptanceRate,
-            likes: problem.likes,
-            tags: problem.tags,
-            companies: [],
-            estimatedMinutes: timePerProblem,
-            weekNumber: week,
-            order: weekProblems.length + 1,
-          });
-
-          remainingMinutes -= timePerProblem;
-        }
-      }
-    }
-
     const diffOrder: Record<string, number> = { EASY: 0, MEDIUM: 1, HARD: 2 };
     weekProblems.sort((a, b) => (diffOrder[a.difficulty] ?? 1) - (diffOrder[b.difficulty] ?? 1));
     const balanced = balanceTopics(weekProblems);
