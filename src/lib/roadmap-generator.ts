@@ -232,6 +232,38 @@ export async function generateRoadmap(
       }
     }
 
+    // Redistribute leftover minutes to other available pools
+    if (remainingMinutes > 0) {
+      for (const diff of ["MEDIUM", "EASY", "HARD"] as const) {
+        const timePerProblem = timeMap[diff];
+        const pool = byDiff[diff];
+
+        while (
+          remainingMinutes >= timePerProblem &&
+          usedIdx[diff] < pool.length
+        ) {
+          const problem = pool[usedIdx[diff]];
+          usedIdx[diff]++;
+
+          weekProblems.push({
+            problemId: problem.id,
+            title: problem.title,
+            titleSlug: problem.titleSlug,
+            difficulty: problem.difficulty,
+            acceptanceRate: problem.acceptanceRate,
+            likes: problem.likes,
+            tags: problem.tags,
+            companies: [],
+            estimatedMinutes: timePerProblem,
+            weekNumber: week,
+            order: weekProblems.length + 1,
+          });
+
+          remainingMinutes -= timePerProblem;
+        }
+      }
+    }
+
     const diffOrder: Record<string, number> = { EASY: 0, MEDIUM: 1, HARD: 2 };
     weekProblems.sort((a, b) => (diffOrder[a.difficulty] ?? 1) - (diffOrder[b.difficulty] ?? 1));
     const balanced = balanceTopics(weekProblems);
