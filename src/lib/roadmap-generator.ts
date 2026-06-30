@@ -262,10 +262,7 @@ export async function generateRoadmap(
     }))
   );
 
-  const BATCH_SIZE = 100;
-  for (let i = 0; i < allPlanProblems.length; i += BATCH_SIZE) {
-    await db.planProblem.createMany({ data: allPlanProblems.slice(i, i + BATCH_SIZE) });
-  }
+  await db.planProblem.createMany({ data: allPlanProblems });
 
   return roadmap;
 }
