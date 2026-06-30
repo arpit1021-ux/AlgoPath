@@ -311,6 +311,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ plan: { id: plan.id, name: plan.name, slug: plan.slug } }, { status: 201 });
   } catch (error) {
     logError(error, { route: "POST /api/plans" });
-    return NextResponse.json({ error: "Failed to create plan" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: "Failed to create plan", detail: message }, { status: 500 });
   }
 }

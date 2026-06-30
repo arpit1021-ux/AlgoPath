@@ -255,7 +255,7 @@ export default function NewPlanPage() {
         }, 1500);
       } else {
         const data = await response.json().catch(() => ({}));
-        setError(data.error || "Failed to create plan. Please try again.");
+        setError(data.detail || data.error || "Failed to create plan. Please try again.");
         setIsGenerating(false);
         return;
       }
