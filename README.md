@@ -1,91 +1,95 @@
 # AlgoPath — Personalized DSA Interview Prep Platform
 
-> A full-stack platform that generates personalized LeetCode roadmaps based on your target company, available study time, and experience level.
+Most interview platforms give everyone the same list of questions.
 
-**Live Demo:** [algo-path-five.vercel.app](https://algo-path-five.vercel.app)
+I wanted to build something that understands who you're preparing for, how much time you actually have, and what you're struggling with.
 
-## What It Does
+AlgoPath isn't just another DSA sheet — it generates a personalized week-by-week roadmap based on your target company, available hours, and skill level. Then it tracks your progress, schedules revisions, and tells you exactly how ready you are.
 
-AlgoPath solves a real problem: DSA interview prep is overwhelming. With 2000+ LeetCode problems, students don't know where to start or what to focus on.
+**[Live Demo](https://algo-path-five.vercel.app)** · **Next.js · TypeScript · PostgreSQL · Prisma**
 
-AlgoPath fixes this by:
-- Generating a **personalized study roadmap** based on your target company (e.g., Amazon, Google, Microsoft)
-- Creating **time-bound plans** based on how many hours/day you can study
-- Tracking your **progress** with readiness scoring
-- Sending **spaced-repetition reminders** so you don't forget solved problems
+---
 
-## Key Features
+## The Problem
 
-- **Company-Wise Roadmaps** — Select your target company and get a curated problem list based on frequency data from 900+ problems
-- **Scheduling Algorithm** — Custom algorithm that distributes problems across your available study time with topic balancing
-- **Spaced Repetition** — Intelligent revision scheduling using spaced-repetition principles to maximize retention
-- **Readiness Score** — Real-time scoring algorithm that tells you how prepared you are for interviews
-- **Analytics Dashboard** — Track problems solved, time spent, topic coverage, and streak data
-- **Secure Authentication** — Clerk-based auth with session management
-- **Rate Limiting** — Redis-based rate limiting via Upstash to prevent abuse
+With 2000+ LeetCode problems, students don't know where to start. Most tools just filter by tag and return a flat list.
+
+But a student targeting Amazon and a student targeting Google should solve different problems — even with the same skill level. The roadmap should adapt to you, not the other way around.
+
+---
+
+## How It Works
+
+```
+Select target company + study hours
+            ↓
+   Scheduling engine generates
+   personalized week-by-week plan
+            ↓
+   Track progress as you solve
+            ↓
+   Spaced repetition schedules
+   revision sessions automatically
+            ↓
+   Readiness score tells you
+   exactly where you stand
+```
+
+---
+
+## Features
+
+- **Company-Weighted Roadmaps** — Your 1st-choice company gets higher priority in problem selection than your 2nd or 3rd
+- **Time-Aware Scheduling** — Calculates exact problem counts per week based on your hours and per-difficulty solving speeds
+- **Topic Balancing** — No more than 3 consecutive problems from the same topic to keep learning varied
+- **Spaced Repetition** — Automatically schedules revision sessions so you don't forget what you've solved
+- **Readiness Scoring** — Weighted score across topic coverage, difficulty mix, revision completion, company prep, and consistency
+- **Weak Topic Detection** — Identifies your weakest areas so you know exactly what to focus on
+
+---
+
+## Engineering Highlights
+
+- **Custom scheduling algorithm** that balances company priority, difficulty distribution, time budgets, and topic variety simultaneously
+- **Company-weighted scoring** using linear decay — 1st company scores 100, 2nd scores 85, 3rd scores 70
+- **Batch database operations** reduced roadmap generation from ~2s to ~200ms
+- **Spaced repetition engine** with composite-indexed queries for fast daily revision lookups
+- **Redis rate limiting** via Upstash for serverless-compatible per-user throttling
+
+---
+
+## The Hardest Problem I Solved
+
+The algorithm was "technically correct" but the roadmaps didn't feel personalized. A user selecting "Very Hard" still got many easy problems.
+
+The issue wasn't in the algorithm itself — it was that the user's preference traveled through React, API, validation, and finally the scheduling engine. A small mismatch in one layer silently caused the whole system to fall back to defaults.
+
+I redesigned the pipeline so difficulty distribution drives time allocation, which drives problem selection. Every preference now flows through the entire system. The lesson: users don't care if an algorithm is correct. They care if the product keeps its promise.
+
+---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS |
-| Backend | Next.js API Routes, REST APIs |
-| Database | PostgreSQL, Prisma ORM |
-| Auth | Clerk |
-| Caching | Redis (Upstash) |
-| Deployment | Vercel |
+| | |
+|-|-|
+| **Frontend** | Next.js 14, React, TypeScript, Tailwind CSS |
+| **Database** | PostgreSQL, Prisma ORM |
+| **Auth** | Clerk |
+| **Rate Limiting** | Redis (Upstash) |
+| **Background Jobs** | Inngest |
+| **Deployment** | Vercel |
 
-## Architecture
+---
 
-```
-src/
-├── app/              # Next.js App Router pages
-├── components/       # React components (UI, charts, forms)
-├── lib/
-│   ├── prisma.ts     # Database client
-│   ├── redis.ts      # Rate limiting
-│   └── utils.ts      # Scheduling algorithm, scoring
-└── prisma/
-    └── schema.prisma # Database schema
-```
-
-## How the Scheduling Algorithm Works
-
-1. User selects target company → system fetches company-specific problem frequency data
-2. User inputs available hours per day and target completion date
-3. Algorithm distributes 900+ problems across the timeline, balancing:
-   - Topic variety (arrays, trees, graphs, DP, etc.)
-   - Difficulty progression (easy → medium → hard)
-   - Company frequency weights (higher frequency = higher priority)
-4. Generates daily study plans with specific problems to solve
-
-## Getting Started
+## Run Locally
 
 ```bash
 git clone https://github.com/arpit1021-ux/AlgoPath.git
-cd AlgoPath
-npm install
-cp .env.example .env  # Add your Clerk, PostgreSQL, Upstash keys
-npx prisma db push
+cd AlgoPath && npm install
+cp .env.example .env
+npx prisma db push && npx prisma db seed
 npm run dev
 ```
-
-## Environment Variables
-
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-DATABASE_URL=
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-```
-
-## What I Learned Building This
-
-- Designing scheduling algorithms that balance multiple constraints
-- Optimizing PostgreSQL queries for large problem datasets
-- Implementing spaced-repetition systems from scratch
-- Building production-grade Next.js apps with TypeScript
 
 ---
 
