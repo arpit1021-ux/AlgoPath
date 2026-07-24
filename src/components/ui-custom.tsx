@@ -45,16 +45,16 @@ export function ProgressBar({
   return (
     <div
       className={cn(
-        "w-full rounded-full overflow-hidden bg-[#1a1b26]",
+        "w-full rounded-full overflow-hidden",
         className
       )}
-      style={{ height }}
+      style={{ height, background: "rgba(255,255,255,0.06)" }}
     >
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{
           width: `${pct}%`,
-          background: color || "linear-gradient(90deg, #8b5cf6, #a78bfa)",
+          background: color || "linear-gradient(90deg, #ffa116, #94a3b8)",
         }}
       />
     </div>
@@ -65,30 +65,30 @@ export function AmbientBlobs() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       <div
-        className="absolute w-[600px] h-[600px] rounded-full animate-drift opacity-60"
+        className="absolute w-[600px] h-[600px] rounded-full opacity-40"
         style={{
-          background:
-            "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 70%)",
           top: "-10%",
           left: "20%",
+          animation: "orbDrift1 25s ease-in-out infinite",
         }}
       />
       <div
-        className="absolute w-[500px] h-[500px] rounded-full animate-drift-slow opacity-60"
+        className="absolute w-[500px] h-[500px] rounded-full opacity-40"
         style={{
-          background:
-            "radial-gradient(circle, rgba(34,211,238,0.05) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(37,99,235,0.04) 0%, transparent 70%)",
           top: "40%",
           right: "10%",
+          animation: "orbDrift2 30s ease-in-out infinite",
         }}
       />
       <div
-        className="absolute w-[400px] h-[400px] rounded-full animate-drift-fast opacity-60"
+        className="absolute w-[400px] h-[400px] rounded-full opacity-40"
         style={{
-          background:
-            "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%)",
           bottom: "10%",
           left: "40%",
+          animation: "orbDrift1 20s ease-in-out infinite reverse",
         }}
       />
     </div>
@@ -115,7 +115,13 @@ export function StatCard({
   return (
     <div className="card-surface-hover p-5">
       <div className="flex items-start justify-between mb-3">
-        <span className="text-xs font-medium text-[#4b4d5e] uppercase tracking-wider">
+        <span
+          className="text-xs font-medium uppercase tracking-wider"
+          style={{
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+          }}
+        >
           {label}
         </span>
         <div
@@ -124,10 +130,16 @@ export function StatCard({
           <Icon className={`w-4 h-4 ${iconColor}`} />
         </div>
       </div>
-      <div className="text-[28px] font-bold text-[#f0f0f5] tracking-tight">
+      <div
+        className="text-[28px] font-bold tracking-tight"
+        style={{
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+        }}
+      >
         {value}
       </div>
-      {sub && <p className="text-xs text-[#8b8d9e] mt-1">{sub}</p>}
+      {sub && <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{sub}</p>}
       {progress !== undefined && (
         <ProgressBar value={progress} className="mt-3" />
       )}

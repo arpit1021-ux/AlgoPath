@@ -2,23 +2,89 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Check, ArrowRight, Menu, X, Zap, Brain, Building2, TrendingUp, RotateCcw, BarChart3, CheckCircle2, Target, Rocket } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  ArrowRight,
+  Menu,
+  X,
+} from "lucide-react";
+import { SpaceBackground } from "@/components/landing/space-background";
+import { GlowCard } from "@/components/landing/glow-card";
+import { FAQAccordion } from "@/components/landing/faq-accordion";
+
+const companies = [
+  "Google", "Meta", "Amazon", "Microsoft", "Apple",
+  "Goldman Sachs", "Bloomberg", "Adobe", "Uber", "Netflix",
+  "Stripe", "TCS", "Infosys", "Wipro",
+];
+
+const personas = [
+  {
+    tag: "CS STUDENTS",
+    title: "Crack your campus placement.",
+    description:
+      "Build a structured DSA foundation with problems weighted by actual interview frequency. Walk in prepared, not panicked.",
+    squares: ["#86868b", "#94a3b8", "#d2d2d7", "#e8e8ed"],
+    barGradient: "linear-gradient(90deg, #a1a1a6, #d2d2d7)",
+  },
+  {
+    tag: "WORKING PROS",
+    title: "Switch to a top company.",
+    description:
+      "Short on time? Our AI fits the right problems into your schedule. Show up to interviews with a readiness score that proves it.",
+    squares: ["#64748b", "#86868b", "#94a3b8", "#d2d2d7"],
+    barGradient: "linear-gradient(90deg, #86868b, #a1a1a6)",
+  },
+  {
+    tag: "CAREER SWITCH",
+    title: "Break into tech with confidence.",
+    description:
+      "New to coding? Start from fundamentals and ramp up. Our progression system adapts to your pace.",
+    squares: ["#94a3b8", "#c7c7cc", "#d2d2d7", "#e8e8ed"],
+    barGradient: "linear-gradient(90deg, #c7c7cc, #d2d2d7)",
+  },
+  {
+    tag: "COMPETITIVE CODERS",
+    title: "Sharpen your edge.",
+    description:
+      "Already strong? Target specific company patterns, fill topic gaps, and build a streak that keeps you sharp.",
+    squares: ["#48484a", "#64748b", "#86868b", "#94a3b8"],
+    barGradient: "linear-gradient(90deg, #6e6e73, #86868b)",
+  },
+];
 
 export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [autoStep, setAutoStep] = useState(0);
+  const [isMouseOverSteps, setIsMouseOverSteps] = useState(false);
+  const [hoveredPersona, setHoveredPersona] = useState<number | null>(null);
+  const [autoPersona, setAutoPersona] = useState(0);
+  const [isMouseOverPersonas, setIsMouseOverPersonas] = useState(false);
+
+  // Auto-cycle for step cards (1→2→3→4, 2s each)
+  useEffect(() => {
+    if (isMouseOverSteps) return;
+    const timer = setInterval(() => {
+      setAutoStep((prev) => (prev + 1) % 4);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [isMouseOverSteps]);
+
+  // Auto-cycle for persona cards (1→2→3→4, 2s each)
+  useEffect(() => {
+    if (isMouseOverPersonas) return;
+    const timer = setInterval(() => {
+      setAutoPersona((prev) => (prev + 1) % 4);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [isMouseOverPersonas]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const [counters, setCounters] = useState({ problems: 0, companies: 0, stages: 0, free: 0 });
-  const statsRef = useState<HTMLElement | null>(null);
-  const statsAnimated = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -35,244 +101,241 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const statsEl = document.getElementById("stats-banner");
-    if (!statsEl) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !statsAnimated[0]) {
-        statsAnimated[1](true);
-        const targets = { problems: 900, companies: 100, stages: 4, free: 100 };
-        const duration = 1800;
-        const start = performance.now();
-        const tick = (now: number) => {
-          const elapsed = now - start;
-          const progress = Math.min(elapsed / duration, 1);
-          const ease = 1 - Math.pow(1 - progress, 3);
-          setCounters({
-            problems: Math.round(ease * targets.problems),
-            companies: Math.round(ease * targets.companies),
-            stages: Math.round(ease * targets.stages),
-            free: Math.round(ease * targets.free),
-          });
-          if (progress < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }
-    }, { threshold: 0.3 });
-    obs.observe(statsEl);
-    return () => obs.disconnect();
-  }, [statsAnimated]);
-
-  useEffect(() => {
-    const grid = document.getElementById("hero-iso-grid");
-    const wrapper = document.getElementById("hero-iso-wrapper");
-    if (!grid || !wrapper) return;
-
-    let targetX = -22;
-    let targetY = 18;
-    let currentX = -22;
-    let currentY = 18;
-    let animId: number;
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = wrapper.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      targetX = -22 + x * 18;
-      targetY = 18 - y * 14;
-    };
-
-    const animate = () => {
-      currentX = lerp(currentX, targetX, 0.06);
-      currentY = lerp(currentY, targetY, 0.06);
-      grid.style.transform = `rotateX(${currentY}deg) rotateY(${currentX}deg)`;
-      animId = requestAnimationFrame(animate);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    animId = requestAnimationFrame(animate);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      cancelAnimationFrame(animId);
-    };
-  }, []);
-
-  useEffect(() => {
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const scrollY = window.scrollY;
-          document.querySelectorAll<HTMLElement>("[data-parallax]").forEach((el) => {
-            const speed = parseFloat(el.dataset.parallax || "0.1");
-            const rect = el.getBoundingClientRect();
-            if (rect.bottom > -200 && rect.top < window.innerHeight + 200) {
-              el.style.transform = `translateY(${scrollY * speed}px)`;
-            }
-          });
-          document.querySelectorAll<HTMLElement>("[data-parallax-x]").forEach((el) => {
-            const speed = parseFloat(el.dataset.parallaxX || "0.05");
-            el.style.transform = `translateX(${scrollY * speed}px)`;
-          });
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      <style jsx global>{`
-        @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .marquee-track { animation: marquee 30s linear infinite; }
+    <div className="min-h-screen" style={{ background: "#1a1a1a", color: "#e2e8f0" }}>
+      <SpaceBackground />
 
-        .feature-card {
-          background: var(--bg-card);
-          border: 1px solid var(--border);
-          border-radius: 16px;
-          padding: 28px;
-          transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-        }
-        .feature-card:hover {
-          background: var(--bg-card-hover);
-          border-color: var(--border-hover);
-          transform: translateY(-2px);
-        }
-
-        .section-divider {
-          height: 1px;
-          background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
-        }
-
-        .hero-gradient-text {
-          background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 30%, #c4b5fd 50%, #818cf8 70%, #2563eb 100%);
-          background-size: 200% auto;
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          animation: shimmer 4s linear infinite;
-        }
-
-        .cta-glow {
-          position: relative;
-          overflow: hidden;
-        }
-        .cta-glow::after {
-          content: '';
-          position: absolute;
-          inset: -2px;
-          border-radius: inherit;
-          background: linear-gradient(135deg, #7c3aed, #2563eb, #7c3aed);
-          background-size: 200% 200%;
-          animation: gradientShift 3s ease infinite;
-          z-index: -1;
-          opacity: 0.5;
-          filter: blur(12px);
-        }
-        @keyframes gradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-      `}</style>
-
-      {/* Navbar */}
+      {/* ── Navbar ── */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
         style={{
-          background: scrolled ? "var(--navbar-bg)" : "transparent",
-          borderBottom: scrolled ? "1px solid var(--border)" : "none",
+          background: scrolled ? "rgba(0,0,0,0.72)" : "transparent",
+          borderBottom: scrolled ? "1px solid rgba(255,255,255,0.06)" : "none",
           backdropFilter: scrolled ? "blur(16px)" : "none",
         }}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
+          {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">A</span>
+            <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+              <rect width="100" height="100" rx="20" fill="url(#logo-grad)" />
+              <path
+                d="M50,30 C50,15 30,15 30,30 C30,45 50,45 50,30 C50,15 70,15 70,30 C70,45 50,45 50,30 Z"
+                stroke="white"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <defs>
+                <linearGradient id="logo-grad" x1="0" y1="0" x2="100" y2="100">
+                  <stop offset="0%" stopColor="#ffa116" />
+                  <stop offset="100%" stopColor="#ff6b35" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="flex flex-col">
+              <span
+                className="font-bold text-lg leading-tight"
+                style={{
+                  color: "#e2e8f0",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                AlgoPath
+              </span>
+              <span
+                className="text-[9px] uppercase tracking-[0.2em] leading-none"
+                style={{ color: "#64748b" }}
+              >
+                BY ALGOPATH.DEV
+              </span>
             </div>
-            <span className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>AlgoPath</span>
           </Link>
+
+          {/* Center nav */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>Features</a>
-            <a href="#how-it-works" className="text-sm transition-colors" style={{ color: "var(--text-secondary)" }}>How It Works</a>
-            <button onClick={() => setPricingModalOpen(true)} className="text-sm transition-colors cursor-pointer" style={{ color: "var(--text-secondary)" }}>Pricing</button>
+            {[
+              { label: "Steps", href: "#steps" },
+              { label: "Who It's For", href: "#who" },
+              { label: "FAQ", href: "#faq" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm transition-colors hover:text-[#fafafa]"
+                style={{
+                  color: "#94a3b8",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
+
+          {/* Right side */}
           <div className="hidden md:flex items-center gap-3">
-            <ThemeToggle />
-            <Link href="/login" className="text-sm font-medium px-4 py-2 transition-colors" style={{ color: "var(--text-secondary)" }}>Sign In</Link>
-            <Link href="/register" className="text-sm font-semibold text-white px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#7c3aed] to-[#2563eb] hover:opacity-90 transition-opacity">Get Started</Link>
+            <Link
+              href="/login"
+              className="text-sm font-medium px-4 py-2 rounded-full transition-colors"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold px-5 py-2 rounded-full transition-all"
+              style={{
+                background: "linear-gradient(135deg, #ffa116 0%, #ff6b35 100%)",
+                color: "#1a1a1a",
+              }}
+            >
+              Get Started
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <button className="md:hidden" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(!mobileOpen)}>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden"
+            style={{ color: "#94a3b8" }}
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
+
+        {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden px-6 py-4 space-y-3" style={{ background: "var(--navbar-bg)", borderTop: "1px solid var(--border)", backdropFilter: "blur(16px)" }}>
-            <a href="#features" className="block text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>Features</a>
-            <a href="#how-it-works" className="block text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>How It Works</a>
-            <button onClick={() => { setMobileOpen(false); setPricingModalOpen(true); }} className="block text-sm text-left cursor-pointer" style={{ color: "var(--text-secondary)" }}>Pricing</button>
-            <div className="pt-2 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)" }}>
-              <Link href="/login" className="text-sm" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>Sign In</Link>
-              <Link href="/register" className="text-sm font-semibold text-white px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#7c3aed] to-[#2563eb] text-center" onClick={() => setMobileOpen(false)}>Get Started</Link>
+          <div
+            className="md:hidden px-6 py-4 space-y-3"
+            style={{
+              background: "rgba(0,0,0,0.72)",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              backdropFilter: "blur(16px)",
+            }}
+          >
+            {[
+              { label: "Steps", href: "#steps" },
+              { label: "Who It's For", href: "#who" },
+              { label: "FAQ", href: "#faq" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="block text-sm"
+                style={{ color: "#94a3b8" }}
+                onClick={() => setMobileOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+            <div
+              className="pt-2 flex flex-col gap-2"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <Link
+                href="/login"
+                className="text-sm"
+                style={{ color: "#94a3b8" }}
+                onClick={() => setMobileOpen(false)}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="glass-btn text-center flex items-center justify-center gap-2"
+                onClick={() => setMobileOpen(false)}
+              >
+                Get Started
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
         )}
       </nav>
 
-      {/* Hero */}
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-16 pb-12 md:pb-24">
-        {/* Background layers */}
-        <div className="absolute inset-0 opacity-[0.03]" style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: "60px 60px",
-        }} />
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#7c3aed]/8 rounded-full blur-[140px] float-1" data-parallax="-0.05" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-[#2563eb]/6 rounded-full blur-[120px] float-2" data-parallax="0.08" />
-
-        {/* Floating accent orbs */}
-        <div className="absolute top-[15%] right-[10%] w-3 h-3 rounded-full bg-[#7c3aed]/30 float-3" data-parallax="-0.12" />
-        <div className="absolute bottom-[20%] left-[8%] w-2 h-2 rounded-full bg-[#2563eb]/25 float-4" data-parallax="0.15" />
-        <div className="absolute top-[60%] right-[20%] w-1.5 h-1.5 rounded-full bg-[#a78bfa]/20 float-1" data-parallax="-0.08" />
+      {/* ── Hero Section ── */}
+      <section className="relative min-h-screen flex items-center pt-20 pb-16" id="steps">
+        {/* Hero orb */}
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-[0.06] pointer-events-none"
+          style={{
+            top: "20%",
+            right: "10%",
+            background: "radial-gradient(circle, rgba(245,245,247,0.03) 0%, transparent 70%)",
+            filter: "blur(80px)",
+          }}
+        />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 w-full">
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-
             {/* Left — Headline */}
             <div className="flex-1 text-center lg:text-left">
-              <h1 className="anim from-bottom text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] mb-6">
-                <span style={{ color: "var(--text-primary)" }}>Stop Grinding</span>
+              <h1
+                className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] mb-6"
+                style={{ fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif" }}
+              >
+                <span style={{ color: "#e2e8f0" }}>Stop Grinding</span>
                 <br />
-                <span style={{ color: "var(--text-primary)" }}>Randomly.</span>
+                <span style={{ color: "#e2e8f0" }}>Randomly.</span>
                 <br />
-                <span className="hero-gradient-text">
+                <span className="gradient-text">
                   Grind SMART.
                 </span>
               </h1>
 
-              <p className="anim from-bottom anim-d3 text-lg max-w-lg mb-10 leading-relaxed mx-auto lg:mx-0" style={{ color: "var(--text-secondary)" }}>
+              <p
+                className="text-lg max-w-lg mb-10 leading-relaxed mx-auto lg:mx-0"
+                style={{ color: "#94a3b8" }}
+              >
                 Tell us your target companies and available time. We build your personalized
                 week-by-week roadmap from 900+ curated problems.
               </p>
 
-              <div className="anim from-bottom anim-d4 flex flex-col sm:flex-row items-center gap-4 mb-10 justify-center lg:justify-start">
+              <div className="flex flex-col sm:flex-row items-center gap-4 mb-10 justify-center lg:justify-start">
                 <Link
                   href="/register"
-                  className="cta-glow text-base font-semibold text-white px-8 py-4 rounded-xl bg-gradient-to-r from-[#7c3aed] to-[#2563eb] hover:brightness-110 transition-all flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-sm transition-all duration-200"
+                  style={{
+                    background: "linear-gradient(135deg, #ffa116 0%, #ff6b35 100%)",
+                    color: "#1a1a1a",
+                    boxShadow: "0 2px 12px rgba(255, 161, 22, 0.3)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = "0 4px 20px rgba(255, 161, 22, 0.4)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "none";
+                    e.currentTarget.style.boxShadow = "0 2px 12px rgba(255, 161, 22, 0.3)";
+                  }}
                 >
                   Start For Free
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
                 <a
-                  href="#how-it-works"
-                  className="text-base font-medium px-8 py-4 rounded-xl transition-all"
-                  style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+                  href="#steps"
+                  className="inline-flex items-center px-7 py-3.5 rounded-full font-semibold text-sm transition-all duration-200"
+                  style={{
+                    border: "1px solid var(--border-strong)",
+                    color: "var(--text-primary)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-hover)";
+                    e.currentTarget.style.background = "var(--bg-input)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-strong)";
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   See How It Works
                 </a>
               </div>
 
-              <div className="anim from-bottom anim-d5 flex flex-wrap gap-8 items-center justify-center lg:justify-start">
+              <div className="flex flex-wrap gap-8 items-center justify-center lg:justify-start">
                 {[
                   { num: "900+", label: "Problems" },
                   { num: "100+", label: "Companies" },
@@ -280,523 +343,469 @@ export default function HomePage() {
                   { num: "100%", label: "Free" },
                 ].map((s, i) => (
                   <div key={s.label} className="flex items-center gap-8">
-                    {i > 0 && <div className="h-8 w-px" style={{ background: "var(--border)" }} />}
+                    {i > 0 && (
+                      <div className="h-8 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />
+                    )}
                     <div className="text-center lg:text-left">
-                      <div className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>{s.num}</div>
-                      <div className="text-xs uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{s.label}</div>
+                      <div
+                        className="text-3xl font-bold"
+                        style={{
+                          color: "#e2e8f0",
+                          fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                        }}
+                      >
+                        {s.num}
+                      </div>
+                      <div className="text-xs uppercase tracking-wider" style={{ color: "#64748b" }}>
+                        {s.label}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Right — 3D Isometric Grid with mouse parallax */}
-            <div className="flex-1 w-full max-w-lg lg:max-w-none anim from-scale anim-d3" id="hero-iso-wrapper">
+            {/* Right — Step Cards */}
+            <div className="flex-1 w-full max-w-lg lg:max-w-none">
               <div
-                id="hero-iso-scene"
-                className="relative w-full aspect-square max-w-[520px] mx-auto"
-                style={{ perspective: "1200px" }}
+                className="grid grid-cols-2 gap-4"
+                onMouseEnter={() => setIsMouseOverSteps(true)}
+                onMouseLeave={() => { setIsMouseOverSteps(false); setHoveredCard(null); }}
               >
-                <div
-                  id="hero-iso-grid"
-                  className="w-full h-full relative"
-                  style={{
-                    transformStyle: "preserve-3d",
-                    transform: "rotateX(18deg) rotateY(-22deg)",
-                  }}
-                >
-                  {/* Isometric grid floor */}
-                  <div
-                    className="absolute inset-0 rounded-3xl"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(37,99,235,0.04) 100%)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      transform: "translateZ(-20px)",
-                    }}
-                  />
+                <GlowCard
+                  index={0}
+                  total={4}
+                  number="01"
+                  title="Pick Your Path"
+                  description="Choose your experience level, timeline, and target companies. Our AI builds the perfect strategy."
+                  iconSquares={["#86868b", "#94a3b8", "#d2d2d7", "#e8e8ed"]}
+                  accentWord="Pick"
+                  wide
+                  isHovered={isMouseOverSteps ? hoveredCard !== null : autoStep === 0}
+                  hasHover={isMouseOverSteps ? hoveredCard !== null : true}
+                  onHover={() => setHoveredCard(0)}
+                />
+                <GlowCard
+                  index={1}
+                  total={4}
+                  number="02"
+                  title="Get Roadmap"
+                  description="Receive a personalized week-by-week study plan with curated problems matched to your goals."
+                  iconSquares={["#64748b", "#86868b", "#94a3b8", "#d2d2d7"]}
+                  accentWord="Get"
+                  isHovered={isMouseOverSteps ? hoveredCard !== null : autoStep === 1}
+                  hasHover={isMouseOverSteps ? hoveredCard !== null : true}
+                  onHover={() => setHoveredCard(1)}
+                />
+                <GlowCard
+                  index={2}
+                  total={4}
+                  number="03"
+                  title="Do Problems"
+                  description="Work through problems on LeetCode, track progress with a single click, and get AI study notes."
+                  iconSquares={["#94a3b8", "#c7c7cc", "#d2d2d7", "#e8e8ed"]}
+                  accentWord="Do"
+                  isHovered={isMouseOverSteps ? hoveredCard !== null : autoStep === 2}
+                  hasHover={isMouseOverSteps ? hoveredCard !== null : true}
+                  onHover={() => setHoveredCard(2)}
+                />
+                <GlowCard
+                  index={3}
+                  total={4}
+                  number="04"
+                  title="Get Hired"
+                  description="Spaced repetition at 2d, 7d, 21d, 45d intervals ensures you never forget what you learned."
+                  iconSquares={["#48484a", "#64748b", "#86868b", "#94a3b8"]}
+                  accentWord="Get"
+                  wide
+                  isHovered={isMouseOverSteps ? hoveredCard !== null : autoStep === 3}
+                  hasHover={isMouseOverSteps ? hoveredCard !== null : true}
+                  onHover={() => setHoveredCard(3)}
+                />
+              </div>
 
-                  {/* Grid lines */}
-                  <div className="absolute inset-0 rounded-3xl overflow-hidden" style={{ transform: "translateZ(-10px)" }}>
-                    <div className="absolute inset-0 opacity-[0.04]" style={{
-                      backgroundImage: `linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)`,
-                      backgroundSize: "52px 52px",
-                    }} />
-                  </div>
-
-                  {/* Floating glass cells — layer 1 (far) */}
-                  <div className="iso-cell absolute top-[8%] left-[5%] w-[42%] rounded-2xl p-4 backdrop-blur-xl float-1" style={{
-                    background: "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(37,99,235,0.08) 100%)",
-                    border: "1px solid rgba(124,58,237,0.2)",
-                    transform: "translateZ(30px)",
-                    boxShadow: "0 8px 32px rgba(124,58,237,0.15), inset 0 1px 0 rgba(255,255,255,0.05)",
-                  }}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-6 h-6 rounded-md bg-[#22c55e]/20 flex items-center justify-center">
-                        <Check className="w-3 h-3 text-[#22c55e]" />
-                      </div>
-                      <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>Week Progress</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[var(--border)] mb-2 overflow-hidden">
-                      <div className="h-full w-[72%] rounded-full bg-gradient-to-r from-[#22c55e] to-[#22c55e]/60 transition-all duration-1000" />
-                    </div>
-                    <div className="flex justify-between text-[9px] text-[var(--muted-foreground)]">
-                      <span>9/12 solved</span>
-                      <span className="text-[#22c55e]">72%</span>
-                    </div>
-                  </div>
-
-                  {/* Floating glass cells — layer 2 */}
-                  <div className="iso-cell absolute top-[5%] right-[2%] w-[48%] rounded-2xl p-4 backdrop-blur-xl float-2" style={{
-                    background: "linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(6,182,212,0.06) 100%)",
-                    border: "1px solid rgba(37,99,235,0.2)",
-                    transform: "translateZ(55px)",
-                    boxShadow: "0 12px 40px rgba(37,99,235,0.12), inset 0 1px 0 rgba(255,255,255,0.05)",
-                  }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>Current Week</span>
-                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#7c3aed]/20 text-[#a78bfa] font-semibold uppercase">Active</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      {["Two Sum", "Valid Parentheses", "LRU Cache"].map((name, i) => (
-                        <div key={name} className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-sm flex items-center justify-center ${i < 2 ? "bg-[#22c55e]/20 border border-[#22c55e]/30" : "border border-white/10"}`}>
-                            {i < 2 && <Check className="w-2 h-2 text-[#22c55e]" />}
-                          </div>
-                          <span className={`text-[10px] ${i < 2 ? "line-through" : ""}`} style={{ color: i < 2 ? "var(--text-muted)" : "var(--text-secondary)" }}>{name}</span>
-                          <span className={`text-[8px] ml-auto ${i === 2 ? "text-[#ef4444]" : "text-[#22c55e]"}`}>{i === 2 ? "Hard" : "Easy"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Floating glass cells — layer 3 (near, large) */}
-                  <div className="iso-cell absolute bottom-[12%] left-[2%] w-[55%] rounded-2xl p-4 backdrop-blur-xl float-3" style={{
-                    background: "linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(37,99,235,0.05) 100%)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    transform: "translateZ(70px)",
-                    boxShadow: "0 16px 48px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
-                  }}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-6 h-6 rounded-md bg-[#7c3aed]/20 flex items-center justify-center">
-                      <Target className="w-3 h-3" style={{ color: "var(--accent-text)" }} />
-                      </div>
-                      <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>Readiness Score</span>
-                    </div>
-                    <div className="flex items-end gap-1 mb-2">
-                      <span className="text-2xl font-bold text-[var(--foreground)]">73</span>
-                      <span className="text-xs text-[#22c55e] mb-1">/100</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[
-                        { label: "Topics", val: 82, color: "#7c3aed" },
-                        { label: "Diff.", val: 65, color: "#2563eb" },
-                        { label: "Rev.", val: 78, color: "#22c55e" },
-                        { label: "Company", val: 70, color: "#f59e0b" },
-                      ].map((m) => (
-                        <div key={m.label} className="text-center">
-                          <div className="h-12 rounded-md relative overflow-hidden bg-white/[0.04] mb-1">
-                            <div className="absolute bottom-0 left-0 right-0 rounded-md transition-all duration-1000" style={{ height: `${m.val}%`, background: `${m.color}33` }} />
-                          </div>
-                          <span className="text-[7px] text-[var(--muted-foreground)]">{m.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Floating glass cells — layer 4 */}
-                  <div className="iso-cell absolute bottom-[8%] right-[4%] w-[40%] rounded-2xl p-4 backdrop-blur-xl float-4" style={{
-                    background: "linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.05) 100%)",
-                    border: "1px solid rgba(245,158,11,0.15)",
-                    transform: "translateZ(45px)",
-                    boxShadow: "0 10px 36px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
-                  }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <RotateCcw className="w-3 h-3" style={{ color: "var(--text-secondary)" }} />
-                      <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>Revisions Due</span>
-                    </div>
-                    <div className="text-xl font-bold text-[var(--foreground)] mb-1">3</div>
-                    <div className="flex items-center gap-1">
-                      {["2d", "7d", "21d", "45d"].map((d, i) => (
-                        <span key={d} className="flex items-center gap-0.5">
-                          <span className={`text-[7px] px-1 py-0.5 rounded ${i === 0 ? "bg-[#f59e0b]/15 text-[#f59e0b]" : "bg-[var(--border)] text-[var(--muted-foreground)]"}`}>{d}</span>
-                          {i < 3 && <span className="text-[7px] text-[var(--muted-foreground)]">→</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Floating particle accents */}
-                  <div className="absolute top-[35%] left-[48%] w-2 h-2 rounded-full bg-[#7c3aed]/40 animate-pulse float-2" style={{ transform: "translateZ(90px)" }} />
-                  <div className="absolute top-[60%] right-[15%] w-1.5 h-1.5 rounded-full bg-[#2563eb]/50 animate-pulse float-3" style={{ transform: "translateZ(80px)" }} />
-                  <div className="absolute top-[20%] right-[35%] w-1 h-1 rounded-full bg-[#22c55e]/40 animate-pulse float-1" style={{ transform: "translateZ(100px)" }} />
-                </div>
+              {/* Meta strip */}
+              <div
+                className="mt-4 flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.2em] font-semibold"
+                style={{ color: "#64748b" }}
+              >
+                <span>ALGOPATH</span>
+                <span style={{ color: "rgba(255,255,255,0.1)" }}>·</span>
+                <span>VERIFIED PROOF OF SKILLS</span>
               </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* Company Logos Marquee */}
-      <div className="section-divider" />
-      <section className="py-16 overflow-hidden" data-parallax="0.03">
-        <p className="anim from-bottom text-center text-xs mb-8 uppercase tracking-wider font-medium" style={{ color: "var(--text-muted)" }}>Trusted by developers from</p>
+      {/* ── Company Logos Marquee ── */}
+      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+      <section className="py-16 overflow-hidden">
+        <p
+          className="text-center text-xs mb-8 uppercase tracking-wider font-medium"
+          style={{ color: "#64748b" }}
+        >
+          Trusted by developers from
+        </p>
         <div className="relative">
-          <div className="flex marquee-track whitespace-nowrap">
-            {["Google", "Meta", "Amazon", "Microsoft", "Apple", "TCS", "Infosys", "Wipro", "Goldman Sachs", "Bloomberg", "Adobe", "Uber", "Netflix", "Stripe"].map((name) => (
-              <span key={name} className="mx-8 text-lg font-bold shrink-0 transition-colors duration-500" style={{ color: "var(--text-muted)" }}>{name}</span>
+          {/* Fade edges */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
+            style={{ background: "linear-gradient(to right, #000000, transparent)" }}
+          />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
+            style={{ background: "linear-gradient(to left, #000000, transparent)" }}
+          />
+
+          {/* Row 1 — forward */}
+          <div className="flex whitespace-nowrap mb-4" style={{ animation: "marquee 30s linear infinite" }}>
+            {[...companies, ...companies].map((name, i) => (
+              <span
+                key={`r1-${i}`}
+                className="mx-6 px-5 py-2 rounded-full text-sm font-semibold shrink-0"
+                style={{
+                  color: "#94a3b8",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                {name}
+              </span>
             ))}
-            {["Google", "Meta", "Amazon", "Microsoft", "Apple", "TCS", "Infosys", "Wipro", "Goldman Sachs", "Bloomberg", "Adobe", "Uber", "Netflix", "Stripe"].map((name) => (
-              <span key={name + "2"} className="mx-8 text-lg font-bold shrink-0 transition-colors duration-500" style={{ color: "var(--text-muted)" }}>{name}</span>
+          </div>
+
+          {/* Row 2 — reverse */}
+          <div className="flex whitespace-nowrap" style={{ animation: "marqueeReverse 35s linear infinite" }}>
+            {[...companies, ...companies].reverse().map((name, i) => (
+              <span
+                key={`r2-${i}`}
+                className="mx-6 px-5 py-2 rounded-full text-sm font-semibold shrink-0"
+                style={{
+                  color: "#94a3b8",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                {name}
+              </span>
             ))}
           </div>
         </div>
       </section>
-      <div className="section-divider" />
+      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
-      {/* Features */}
-      <section id="features" className="relative py-20" data-parallax="-0.02">
+      {/* ── Who Is It For ── */}
+      <section id="who" className="relative py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="text-center mb-20">
-            <span className="anim from-bottom inline-block text-xs font-semibold tracking-[0.2em] mb-4 uppercase" style={{ color: "var(--accent-text)" }}>Powerful Features</span>
-            <h2 className="anim from-bottom anim-d1 text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: "var(--text-primary)" }}>
-              Everything You Need to
-              <br />
-              <span className="hero-gradient-text">Ace Your Interview</span>
+          <div className="mb-12">
+            <h2
+              className="text-4xl md:text-6xl font-bold tracking-tight mb-4"
+              style={{
+                color: "#e2e8f0",
+                fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+              }}
+            >
+              Who is it for?
             </h2>
-            <p className="anim from-bottom anim-d2 max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              No more guessing what to study. AlgoPath gives you a complete system.
+            <p className="text-lg" style={{ color: "#94a3b8" }}>
+              Preparing for placements? OA rounds? Building problem-solving skills?
+              AlgoPath is built for you.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { icon: <Brain className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "AI-Driven Scheduling", desc: "Time-boxed to YOUR schedule. 8h/week? We fit exactly the right problems.", d: "anim-d1" },
-              { icon: <Building2 className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "FAANG Targeting", desc: "Filter by Google, Meta, Amazon. Weighted by actual interview frequency.", d: "anim-d2" },
-              { icon: <TrendingUp className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "Smart Progression", desc: "Easy → Medium → Hard. Ramps difficulty as your interview approaches.", d: "anim-d3" },
-              { icon: <RotateCcw className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "Spaced Repetition", desc: "Auto-schedules reviews at 2d, 7d, 21d, 45d intervals. Never forget a solution.", d: "anim-d4" },
-              { icon: <BarChart3 className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "Readiness Score", desc: "Real-time score across topic coverage, difficulty, consistency, and company fit.", d: "anim-d5" },
-              { icon: <CheckCircle2 className="w-6 h-6" style={{ color: "var(--accent-text)" }} />, title: "Topic Balancing", desc: "No DP burnout. Automatically mixes Arrays, Graphs, Trees, and more.", d: "anim-d6" },
-            ].map((f) => (
-              <div key={f.title} className={`anim from-bottom feature-card p-7 ${f.d}`}>
-                <div className="mb-4">{f.icon}</div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: "var(--text-primary)" }}>{f.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{f.desc}</p>
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+            onMouseEnter={() => setIsMouseOverPersonas(true)}
+            onMouseLeave={() => setIsMouseOverPersonas(false)}
+          >
+            {personas.map((card, i) => {
+              const isActive = isMouseOverPersonas ? hoveredPersona !== null : autoPersona === i;
+              const isBlurred = isMouseOverPersonas
+                ? hoveredPersona !== null && !isActive
+                : autoPersona !== i;
+              return (
+              <div
+                key={card.tag}
+                className="group relative rounded-2xl p-6 transition-all duration-500 cursor-pointer"
+                style={{
+                  background: isActive ? "rgba(255, 255, 255, 0.08)" : "var(--bg-card)",
+                  border: isActive ? "1px solid var(--border-hover)" : "1px solid var(--border)",
+                  boxShadow: isActive ? "var(--shadow-md)" : "none",
+                  backdropFilter: "blur(12px)",
+                  opacity: isBlurred ? 0.3 : 1,
+                  filter: isBlurred ? "blur(4px)" : "none",
+                  transform: isActive ? "scale(1.02)" : isBlurred ? "scale(0.97)" : "none",
+                }}
+                onMouseEnter={() => setHoveredPersona(i)}
+                onMouseLeave={() => setHoveredPersona(null)}
+              >
+                {/* Icon grid */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="grid grid-cols-2 gap-1">
+                    {card.squares.map((color, j) => (
+                      <div
+                        key={j}
+                        className="w-4 h-4 rounded-sm transition-all duration-500"
+                        style={{
+                          background: color,
+                          opacity: isActive ? 1 : 0.6,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div
+                    className="w-2 h-2 rounded-full transition-all duration-500"
+                    style={{
+                      background: isActive ? "rgba(255, 161, 22, 0.5)" : "rgba(255,255,255,0.1)",
+                      boxShadow: isActive ? "0 0 6px rgba(255, 161, 22, 0.3)" : "none",
+                    }}
+                  />
+                </div>
+
+                {/* Label */}
+                <p
+                  className="text-xs font-semibold tracking-[0.15em] uppercase mb-2"
+                  style={{ color: "#94a3b8" }}
+                >
+                  {card.tag}
+                </p>
+
+                {/* Title */}
+                <h3
+                  className="text-xl font-semibold mb-3"
+                  style={{
+                    color: "#e2e8f0",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                  }}
+                >
+                  {card.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-sm leading-relaxed transition-colors duration-500" style={{ color: isActive ? "#d2d2d7" : "#94a3b8" }}>
+                  {card.description}
+                </p>
+
+                {/* Bottom progress bar */}
+                <div
+                  className="absolute bottom-0 left-6 right-6 h-[2px] rounded-full mt-6"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  <div
+                    className="h-full rounded-full origin-left transition-all duration-500"
+                    style={{
+                      width: "100%",
+                      background: isActive
+                        ? "linear-gradient(90deg, #ffa116, #94a3b8)"
+                        : card.barGradient,
+                      opacity: isActive ? 0.8 : 0.5,
+                      transform: "scaleX(1)",
+                    }}
+                  />
+                </div>
+
+                {/* Corner accent */}
+                <div
+                  className="absolute top-6 right-6 w-2 h-2 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.15)" }}
+                />
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
-      <div style={{ height: '1px', background: 'var(--border)' }} />
+      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
-      {/* How It Works */}
-      <section id="how-it-works" className="relative py-20" data-parallax="0.02">
+      {/* ── FAQ ── */}
+      <section id="faq" className="relative py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="text-center mb-16">
-            <span className="anim from-bottom inline-block text-xs font-semibold tracking-[0.2em] text-[#7c3aed] mb-4 uppercase">
-              How It Works
-            </span>
-            <h2 className="anim from-bottom anim-d1 text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: "var(--text-primary)" }}>
-              From Zero to
-              <br />
-              <span className="bg-gradient-to-r from-[#7c3aed] to-[#2563eb] bg-clip-text text-transparent">
-                Interview Ready
-              </span>
-            </h2>
-          </div>
-
-          <div className="space-y-16">
-            {/* Step 1 */}
-            <div className="anim from-left flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-              <div className="flex-1">
-                <div className="gradient-text leading-none mb-2 select-none" style={{ fontSize: "clamp(6rem, 15vw, 10rem)", fontWeight: 900, opacity: 0.2 }}>1</div>
-                <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>Set Your Goals</h3>
-                <p className="leading-relaxed max-w-md" style={{ color: "var(--text-secondary)" }}>
-                  Choose your experience level, timeline, weekly hours, and target companies.
-                  Our AI analyzes your inputs to build the perfect preparation strategy.
-                </p>
-              </div>
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-[340px] p-6 space-y-5" style={{ border: "1px solid var(--border)", background: "var(--card)", backdropFilter: "blur(12px)", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", borderRadius: 16 }}>
-                  <div>
-                    <div className="text-[10px] text-[var(--muted-foreground)] mb-2 uppercase tracking-wider">Experience</div>
-                    <div className="flex gap-2">
-                      <span className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)]">Beginner</span>
-                      <span className="text-[11px] px-3 py-1.5 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/10 text-[#a78bfa] flex items-center gap-1">Intermediate <Check className="w-3 h-3" /></span>
-                      <span className="text-[11px] px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)]">Expert</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-[var(--muted-foreground)] mb-2 uppercase tracking-wider">Timeline</div>
-                    <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
-                      <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-[#7c3aed] to-[#2563eb]" />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-[var(--muted-foreground)] mt-1">
-                      <span>1 week</span>
-                      <span className="text-[#a78bfa]">4 Weeks</span>
-                      <span>24 weeks</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-[var(--muted-foreground)] mb-2 uppercase tracking-wider">Target Companies</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] px-2 py-1 rounded bg-[#2563eb]/10 text-[#60a5fa] border border-[#2563eb]/20">Google</span>
-                      <span className="text-[10px] px-2 py-1 rounded bg-[#f97316]/10 text-[#fb923c] border border-[#f97316]/20">Amazon</span>
-                      <span className="text-[10px] px-2 py-1 rounded bg-[#7c3aed]/10 text-[#a78bfa] border border-[#7c3aed]/20">Meta</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="anim from-right flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16">
-              <div className="flex-1">
-                <div className="gradient-text leading-none mb-2 select-none" style={{ fontSize: "clamp(6rem, 15vw, 10rem)", fontWeight: 900, opacity: 0.2 }}>2</div>
-                <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>Get Your Roadmap</h3>
-                <p className="leading-relaxed max-w-md" style={{ color: "var(--text-secondary)" }}>
-                  Receive a personalized week-by-week study plan with carefully curated
-                  problems matched to your goals.
-                </p>
-              </div>
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-[340px] p-6" style={{ border: "1px solid var(--border)", background: "var(--card)", backdropFilter: "blur(12px)", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", borderRadius: 16 }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-medium text-[var(--muted-foreground)]">Week 1</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
-                        <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-[#7c3aed] to-[#2563eb]" />
-                      </div>
-                      <span className="text-[10px] text-[var(--muted-foreground)]">3/8</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {[{ name: "Two Sum", diff: "Easy", diffColor: "text-[#22c55e]/70" }, { name: "Valid Parentheses", diff: "Medium", diffColor: "text-[#f59e0b]/70" }, { name: "Trapping Rain Water", diff: "Hard", diffColor: "text-[#ef4444]/70" }].map((p) => (
-                      <div key={p.name} className="flex items-center gap-3 py-1.5">
-                        <div className="w-4 h-4 rounded border border-white/10 flex items-center justify-center shrink-0" />
-                        <span className="text-xs flex-1" style={{ color: "var(--text-secondary)" }}>{p.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${p.diffColor}`}>{p.diff}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="anim from-left flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-              <div className="flex-1">
-                <div className="gradient-text leading-none mb-2 select-none" style={{ fontSize: "clamp(6rem, 15vw, 10rem)", fontWeight: 900, opacity: 0.2 }}>3</div>
-                <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>Solve & Track</h3>
-                <p className="leading-relaxed max-w-md" style={{ color: "var(--text-secondary)" }}>
-                  Work through problems directly on LeetCode, track your progress
-                  with a single click, and get AI-generated study notes.
-                </p>
-              </div>
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-[340px] p-6" style={{ border: "1px solid var(--border)", background: "var(--card)", backdropFilter: "blur(12px)", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", borderRadius: 16 }}>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 py-1.5">
-                      <div className="w-4 h-4 rounded bg-[#22c55e]/20 border border-[#22c55e]/30 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5 text-[#22c55e]" />
-                      </div>
-                      <span className="text-xs text-[var(--muted-foreground)] line-through flex-1">Two Sum</span>
-                    </div>
-                    <div className="flex items-center gap-3 py-1.5">
-                      <div className="w-4 h-4 rounded bg-[#22c55e]/20 border border-[#22c55e]/30 flex items-center justify-center shrink-0">
-                        <Check className="w-2.5 h-2.5 text-[#22c55e]" />
-                      </div>
-                      <span className="text-xs text-[var(--muted-foreground)] line-through flex-1">Valid Parentheses</span>
-                    </div>
-                    <div className="flex items-center gap-3 py-1.5">
-                      <div className="w-4 h-4 rounded border border-white/10 flex items-center justify-center shrink-0" />
-                        <span className="text-xs flex-1" style={{ color: "var(--text-secondary)" }}>Merge Intervals</span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                    <div className="flex gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--border)] text-[var(--muted-foreground)]">Arrays</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--border)] text-[var(--muted-foreground)]">Hashing</span>
-                    </div>
-                    <span className="text-[10px] font-medium text-[#22c55e]">7/54 SOLVED</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="anim from-right flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16">
-              <div className="flex-1">
-                <div className="gradient-text leading-none mb-2 select-none" style={{ fontSize: "clamp(6rem, 15vw, 10rem)", fontWeight: 900, opacity: 0.2 }}>4</div>
-                <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>Revise & Master</h3>
-                <p className="leading-relaxed max-w-md" style={{ color: "var(--text-secondary)" }}>
-                  Our spaced repetition engine automatically schedules revisions at
-                  optimal intervals to ensure you never forget what you learned.
-                </p>
-              </div>
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-[340px] p-6" style={{ position: 'relative', zIndex: 1, marginBottom: '2rem', overflow: 'hidden', border: "1px solid var(--border)", background: "var(--card)", backdropFilter: "blur(12px)", boxShadow: "0 20px 60px rgba(0,0,0,0.4)", borderRadius: 16 }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-medium text-[var(--muted-foreground)]">Due Today: 3</span>
-                  </div>
-                  <div className="space-y-2">
-                    {[{ problem: "Two Sum" }, { problem: "Valid Parentheses" }].map((r) => (
-                      <div key={r.problem} className="flex items-center justify-between py-1.5">
-                        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{r.problem}</span>
-                        <button className="text-[10px] px-2 py-0.5 rounded bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20">Done</button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-white/[0.06]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-[var(--muted-foreground)]">Revision Intervals</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {["2d", "7d", "21d", "45d"].map((d, i) => (
-                        <span key={d} className="flex items-center gap-1">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--border)] text-[var(--muted-foreground)]">{d}</span>
-                          {i < 3 && <span className="text-[10px] text-[var(--muted-foreground)]">→</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <FAQAccordion />
         </div>
       </section>
 
-      {/* Stats Banner */}
-      <div className="section-divider" />
-      <section id="stats-banner" className="relative py-20 overflow-hidden" data-parallax="-0.01">
-        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, var(--accent-dim), transparent, var(--accent-dim))" }} />
-        <div className="absolute inset-0" style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }} />
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { value: counters.problems, suffix: "+", label: "Curated Problems" },
-              { value: counters.companies, suffix: "+", label: "Target Companies" },
-              { value: counters.stages, suffix: "-Stage", label: "Revision System" },
-              { value: counters.free, suffix: "%", label: "Free Forever" },
-            ].map((s) => (
-              <div key={s.label} className="text-center anim from-bottom py-4">
-                <div className="text-2xl md:text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
-                  {s.value}{s.suffix}
-                </div>
-                <div className="text-xs mt-1 uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      <div className="section-divider" />
+      <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
 
-      {/* CTA */}
-      <section className="relative py-20 flex items-center justify-center min-h-[50vh]" id="pricing" data-parallax="0.02">
-        <div className="max-w-3xl mx-auto px-6 text-center w-full">
-          <div className="anim from-scale p-12 md:p-16 relative overflow-hidden" style={{ animation: "glow 4s ease-in-out infinite", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16 }}>
-            <div className="absolute inset-0 bg-gradient-to-br from-[#7c3aed]/5 to-[#2563eb]/5" />
+      {/* ── Final CTA ── */}
+      <section className="relative py-20 flex items-center justify-center">
+        {/* CTA orb */}
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-[0.05] pointer-events-none"
+          style={{
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "radial-gradient(circle, rgba(245,245,247,0.03) 0%, transparent 70%)",
+            filter: "blur(80px)",
+          }}
+        />
+
+        <div className="max-w-5xl mx-auto px-6 w-full relative z-10">
+          <div
+            className="rounded-2xl p-12 md:p-16 relative overflow-hidden"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
             <div className="relative z-10">
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4" style={{ color: "var(--text-primary)" }}>
-                Ready to Grind{" "}
-                <span className="hero-gradient-text">SMART?</span>
+              <h2
+                className="text-4xl md:text-6xl font-bold tracking-tight mb-4"
+                style={{
+                  color: "#e2e8f0",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                Ready to start?
               </h2>
-              <p className="max-w-md mx-auto mb-8" style={{ color: "var(--text-secondary)" }}>
-                No credit card required. No subscription needed.
-                Start building your personalized interview roadmap today.
+              <p className="text-lg mb-2" style={{ color: "#94a3b8" }}>
+                Ready to prove what you can do?
               </p>
-              <Link href="/dashboard" className="cta-glow inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-4 rounded-xl bg-gradient-to-r from-[#7c3aed] to-[#2563eb] hover:brightness-110 transition-all">
-                Go to Dashboard
-                <ArrowRight className="w-5 h-5" />
-              </Link>
+              <p className="text-base mb-10 max-w-xl" style={{ color: "#64748b" }}>
+                Pick a problem set, follow the roadmap, track your progress. Your first
+                personalized interview prep starts here.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full font-semibold text-sm transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #ffa116 0%, #ff6b35 100%)",
+                    color: "#1a1a1a",
+                  }}
+                >
+                  Sign In / Sign Up
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <a
+                  href="#steps"
+                  className="inline-flex items-center justify-center px-7 py-3.5 rounded-full font-semibold text-sm transition-all"
+                  style={{
+                    border: "1px solid var(--border-strong)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  View Features
+                </a>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer style={{ 
-        borderTop: '1px solid var(--border)',
-        background: 'var(--bg-secondary)',
-        padding: '3rem 1.5rem 2rem',
-      }}>
-        <div style={{ maxWidth: '1152px', margin: '0 auto' }}>
-          
-          {/* Top row */}
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            gap: '2rem',
-            marginBottom: '2rem',
-          }}>
+      {/* ── Footer ── */}
+      <footer
+        style={{
+          borderTop: "1px solid var(--border)",
+          background: "var(--bg-secondary)",
+          padding: "3rem 1.5rem 2rem",
+        }}
+      >
+        <div style={{ maxWidth: "1152px", margin: "0 auto" }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              gap: "2rem",
+              marginBottom: "2rem",
+            }}
+          >
             {/* Brand */}
             <div>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                marginBottom: '0.75rem' 
-              }}>
-                <div style={{
-                  width: '28px', height: '28px',
-                  background: 'var(--accent)',
-                  borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Zap style={{ width: '14px', height: '14px', color: '#fff' }} />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+                  <rect width="100" height="100" rx="20" fill="url(#footer-logo-grad)" />
+                  <path
+                    d="M50,30 C50,15 30,15 30,30 C30,45 50,45 50,30 C50,15 70,15 70,30 C70,45 50,45 50,30 Z"
+                    stroke="white"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  <defs>
+                    <linearGradient id="footer-logo-grad" x1="0" y1="0" x2="100" y2="100">
+                      <stop offset="0%" stopColor="#ffa116" />
+                      <stop offset="100%" stopColor="#ff6b35" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#e2e8f0",
+                      fontSize: "0.95rem",
+                      fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                    }}
+                  >
+                    AlgoPath
+                  </span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "8px",
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: "#64748b",
+                    }}
+                  >
+                    SMART LEETCODE PREP
+                  </span>
                 </div>
-                <span style={{ 
-                  fontWeight: 600, 
-                  color: 'var(--text-primary)',
-                  fontSize: '0.95rem' 
-                }}>
-                  AlgoPath
-                </span>
               </div>
-              <p style={{ 
-                color: 'var(--text-muted)', 
-                fontSize: '0.8rem',
-                maxWidth: '220px',
-                lineHeight: 1.6 
-              }}>
-                Personalized DSA roadmaps for placement and OA preparation.
-                Free forever.
+              <p style={{ color: "#64748b", fontSize: "0.8rem", maxWidth: 220, lineHeight: 1.6 }}>
+                Personalized DSA roadmaps for placement and OA preparation. Free forever.
               </p>
             </div>
 
             {/* Links columns */}
-            <div style={{ display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
+            <div style={{ display: "flex", gap: "3rem", flexWrap: "wrap" }}>
               <div>
-                <p style={{ 
-                  color: 'var(--text-primary)', 
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  marginBottom: '0.75rem',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase' as const
-                }}>
+                <p
+                  style={{
+                    color: "#e2e8f0",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                  }}
+                >
                   Product
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {[
-                    { label: 'Features', href: '#features' },
-                    { label: 'How It Works', href: '#how-it-works' },
-                    { label: 'Pricing', href: '#' },
+                    { label: "Features", href: "#steps" },
+                    { label: "Who It's For", href: "#who" },
+                    { label: "FAQ", href: "#faq" },
                   ].map((link) => (
                     <a
                       key={link.label}
                       href={link.href}
-                      style={{ 
-                        color: 'var(--text-muted)', 
-                        fontSize: '0.8rem',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s',
+                      style={{
+                        color: "#64748b",
+                        fontSize: "0.8rem",
+                        textDecoration: "none",
+                        transition: "color 0.2s",
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
                     >
                       {link.label}
                     </a>
@@ -805,33 +814,36 @@ export default function HomePage() {
               </div>
 
               <div>
-                <p style={{ 
-                  color: 'var(--text-primary)', 
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  marginBottom: '0.75rem',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase' as const
-                }}>
+                <p
+                  style={{
+                    color: "#e2e8f0",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                  }}
+                >
                   Legal
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {[
-                    { label: 'Privacy Policy', href: '/privacy' },
-                    { label: 'Terms of Service', href: '/terms' },
-                    { label: 'Cookie Policy', href: '/cookies' },
+                    { label: "Privacy Policy", href: "/privacy" },
+                    { label: "Terms of Service", href: "/terms" },
+                    { label: "Cookie Policy", href: "/cookies" },
                   ].map((link) => (
                     <a
                       key={link.label}
                       href={link.href}
-                      style={{ 
-                        color: 'var(--text-muted)', 
-                        fontSize: '0.8rem',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s',
+                      style={{
+                        color: "#64748b",
+                        fontSize: "0.8rem",
+                        textDecoration: "none",
+                        transition: "color 0.2s",
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
                     >
                       {link.label}
                     </a>
@@ -840,35 +852,38 @@ export default function HomePage() {
               </div>
 
               <div>
-                <p style={{ 
-                  color: 'var(--text-primary)', 
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  marginBottom: '0.75rem',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase' as const
-                }}>
+                <p
+                  style={{
+                    color: "#e2e8f0",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    marginBottom: "0.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                  }}
+                >
                   Connect
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {[
-                    { label: 'GitHub', href: 'https://github.com/arpit1021-ux/AlgoPath' },
-                    { label: 'LinkedIn', href: 'https://linkedin.com' },
-                    { label: 'Contact', href: 'mailto:hello@algopath.dev' },
+                    { label: "GitHub", href: "https://github.com/arpit1021-ux/AlgoPath" },
+                    { label: "LinkedIn", href: "https://linkedin.com" },
+                    { label: "Contact", href: "mailto:hello@algopath.dev" },
                   ].map((link) => (
                     <a
                       key={link.label}
                       href={link.href}
-                      target={link.href.startsWith('http') ? '_blank' : undefined}
-                      rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                      style={{ 
-                        color: 'var(--text-muted)', 
-                        fontSize: '0.8rem',
-                        textDecoration: 'none',
-                        transition: 'color 0.2s',
+                      target={link.href.startsWith("http") ? "_blank" : undefined}
+                      rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                      style={{
+                        color: "#64748b",
+                        fontSize: "0.8rem",
+                        textDecoration: "none",
+                        transition: "color 0.2s",
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
                     >
                       {link.label}
                     </a>
@@ -879,60 +894,28 @@ export default function HomePage() {
           </div>
 
           {/* Divider */}
-          <div style={{ 
-            height: '1px', 
-            background: 'var(--border)',
-            margin: '1.5rem 0'
-          }} />
+          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "1.5rem 0" }} />
 
           {/* Bottom row */}
-          <div style={{ 
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-              &copy; 2026 AlgoPath. All rights reserved. Built for developers preparing 
-              for placements and OA rounds.
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+            }}
+          >
+            <p style={{ color: "#64748b", fontSize: "0.75rem" }}>
+              &copy; 2026 AlgoPath. All rights reserved. Built for developers preparing for
+              placements and OA rounds.
             </p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            <p style={{ color: "#64748b", fontSize: "0.75rem" }}>
               Not affiliated with LeetCode or any company mentioned.
             </p>
           </div>
         </div>
       </footer>
-
-      {pricingModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-          style={{ background: 'rgba(0,0,0,0.7)' }}
-          onClick={() => setPricingModalOpen(false)}
-        >
-          <div
-            className="rounded-2xl p-8 max-w-sm w-full mx-4 text-center"
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3">
-              <Rocket className="w-10 h-10 mx-auto" style={{ color: "var(--accent-text)" }} />
-            </div>
-            <h3 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>100% Free</h3>
-            <p className="text-slate-400 text-sm mb-4">
-              AlgoPath is free forever during our beta. No credit card,
-              no hidden fees, no premium tiers.
-            </p>
-            <button
-              onClick={() => setPricingModalOpen(false)}
-              className="px-6 py-2 rounded-lg text-white text-sm font-semibold cursor-pointer"
-              style={{ background: 'var(--accent)' }}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

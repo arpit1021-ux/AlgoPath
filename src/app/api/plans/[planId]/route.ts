@@ -38,6 +38,19 @@ export async function GET(
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
+    // Quick status check — short-circuit if still generating
+    const quickStatus = await db.plan.findFirst({
+      where: { id: resolved.id },
+      select: { status: true },
+    });
+
+    if (quickStatus?.status === "GENERATING" || quickStatus?.status === "FAILED") {
+      return NextResponse.json(
+        { plan: { id: resolved.id, status: quickStatus.status } },
+        { headers: { "Cache-Control": "private, max-age=1" } }
+      );
+    }
+
     const plan = await db.plan.findFirst({
       where: { id: resolved.id, userId: user.id, deletedAt: null },
       select: {

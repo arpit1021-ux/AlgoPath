@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   BookOpen,
   RotateCcw,
@@ -15,8 +14,8 @@ import {
   Map,
   LayoutDashboard,
   ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 
 const globalNavItems = [
@@ -73,6 +72,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const pageTitle = useMemo(() => getPageTitle(pathname), [pathname]);
   const planSlug = useMemo(() => getPlanSlugFromPath(pathname), [pathname]);
   const inPlan = planSlug !== null;
@@ -84,15 +84,55 @@ export default function DashboardLayout({
 
   const NavContent = () => (
     <>
-      <div className="p-5" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+      <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] flex items-center justify-center">
-            <span className="text-white font-bold text-sm">A</span>
-          </div>
-          <span className="font-bold text-lg" style={{ color: "var(--text-primary)" }}>
-            AlgoPath
-          </span>
+          <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+            <rect width="100" height="100" rx="20" fill="url(#sidebar-logo-grad)" />
+            <path
+              d="M50,30 C50,15 30,15 30,30 C30,45 50,45 50,30 C50,15 70,15 70,30 C70,45 50,45 50,30 Z"
+              stroke="white"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <defs>
+              <linearGradient id="sidebar-logo-grad" x1="0" y1="0" x2="100" y2="100">
+                <stop offset="0%" stopColor="#ffa116" />
+                <stop offset="100%" stopColor="#ff6b35" />
+              </linearGradient>
+            </defs>
+          </svg>
+          {!collapsed && (
+            <div>
+              <span
+                className="font-bold text-lg leading-tight block"
+                style={{
+                  color: "var(--text-primary)",
+                  fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                }}
+              >
+                AlgoPath
+              </span>
+              <span
+                className="text-[8px] uppercase tracking-[0.15em] leading-none"
+                style={{ color: "var(--text-muted)" }}
+              >
+                SMART LEETCODE PREP
+              </span>
+            </div>
+          )}
         </Link>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-7 h-7 rounded-md flex items-center justify-center transition-colors shrink-0"
+          style={{
+            color: "var(--text-muted)",
+          }}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </div>
 
       <nav className="flex-1 p-3 space-y-1">
@@ -105,11 +145,21 @@ export default function DashboardLayout({
               style={{ color: "var(--text-secondary)" }}
             >
               <ChevronLeft className="w-4 h-4" />
-              All Plans
+              {!collapsed && "All Plans"}
             </Link>
-            <div className="px-3 py-1.5 mb-1">
-              <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>This Plan</p>
-            </div>
+            {!collapsed && (
+              <div className="px-3 py-1.5 mb-1">
+                <p
+                  className="text-[10px] font-semibold uppercase tracking-widest"
+                  style={{
+                    color: "var(--text-muted)",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+                  }}
+                >
+                  This Plan
+                </p>
+              </div>
+            )}
             {planNavItems.map((item) => {
               const isActive = item.href === `/dashboard/plans/${planSlug}` ? pathname === `/dashboard/plans/${planSlug}` : pathname.startsWith(item.href);
               return (
@@ -117,15 +167,18 @@ export default function DashboardLayout({
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
-                  className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200"
+                  className="w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200"
                   style={{
+                    padding: collapsed ? "10px 0" : "10px 12px",
+                    justifyContent: collapsed ? "center" : "flex-start",
                     background: isActive ? "var(--sidebar-item-active)" : "transparent",
                     color: isActive ? "var(--accent-text)" : "var(--text-secondary)",
                     borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                    fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
                   }}
                 >
                   <item.icon className="w-[18px] h-[18px]" />
-                  {item.label}
+                  {!collapsed && item.label}
                 </Link>
               );
             })}
@@ -140,27 +193,39 @@ export default function DashboardLayout({
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200"
+              className="w-full flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium transition-all duration-200"
               style={{
+                padding: collapsed ? "10px 0" : "10px 12px",
+                justifyContent: collapsed ? "center" : "flex-start",
                 background: isActive ? "var(--sidebar-item-active)" : "transparent",
                 color: isActive ? "var(--accent-text)" : "var(--text-secondary)",
                 borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent",
+                fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
               }}
             >
               <item.icon className="w-[18px] h-[18px]" />
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
       <div className="p-4" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
-        <Link href="/dashboard/profile" className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer" style={{ background: "var(--sidebar-item-hover)" }}>
+        <Link
+          href="/dashboard/profile"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+          style={{
+            background: "var(--sidebar-item-hover)",
+            justifyContent: collapsed ? "center" : "flex-start",
+          }}
+        >
           <UserButton appearance={{ elements: { avatarBox: "cursor-pointer w-8 h-8 rounded-full overflow-hidden" } }} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>Account</p>
-            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>Manage settings</p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>Account</p>
+              <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>Manage settings</p>
+            </div>
+          )}
         </Link>
       </div>
     </>
@@ -176,27 +241,56 @@ export default function DashboardLayout({
         {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
-      <aside className="hidden lg:flex w-[260px] min-h-screen flex-col fixed left-0 top-0 z-[100]" style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}>
+      <aside
+        className="hidden lg:flex flex-col fixed left-0 top-0 z-[100] transition-all duration-300"
+        style={{
+          width: collapsed ? "64px" : "260px",
+          minHeight: "100vh",
+          background: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+        }}
+      >
         <NavContent />
       </aside>
 
       <div className={`lg:hidden fixed inset-0 z-[105] transition-opacity duration-300 ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-        <div className={`absolute left-0 top-0 bottom-0 w-[260px] flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}>
+        <div
+          className={`absolute left-0 top-0 bottom-0 w-[260px] flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+          style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}
+        >
           <NavContent />
         </div>
       </div>
 
-      <main className="flex-1 lg:ml-[260px] min-h-screen">
-        <div className="sticky top-0 z-50 px-6 lg:px-10 h-14 flex items-center justify-between" style={{ background: "var(--navbar-bg)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--border)" }}>
-          <h2 className="text-sm font-semibold capitalize ml-12 lg:ml-0" style={{ color: "var(--text-primary)" }}>{pageTitle}</h2>
+      <main className="flex-1 min-h-screen" style={{ marginLeft: collapsed ? "64px" : "260px", transition: "margin-left 0.3s ease" }}>
+        <div
+          className="sticky top-0 z-50 px-6 lg:px-10 h-14 flex items-center justify-between"
+          style={{
+            background: "var(--navbar-bg)",
+            backdropFilter: "blur(16px)",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <h2
+            className="text-sm font-semibold capitalize ml-12 lg:ml-0"
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+            }}
+          >
+            {pageTitle}
+          </h2>
           <div className="flex items-center gap-3">
             {pathname !== "/dashboard/plans/new" && (
-              <Link href="/dashboard/plans/new" className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all" style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+              <Link
+                href="/dashboard/plans/new"
+                className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              >
                 + New Plan
               </Link>
             )}
-            <ThemeToggle />
             <UserButton appearance={{ elements: { avatarBox: "cursor-pointer w-8 h-8 rounded-full overflow-hidden" } }} />
           </div>
         </div>

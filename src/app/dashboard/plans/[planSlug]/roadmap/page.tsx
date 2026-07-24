@@ -22,11 +22,12 @@ import {
   Target,
   TrendingUp,
   Play,
-  Rocket,
   Zap,
   Calendar,
   Trophy,
   Sparkles,
+  ThumbsUp,
+  LayoutDashboard,
 } from "lucide-react";
 
 interface PlanProblem {
@@ -66,7 +67,7 @@ interface Plan {
 }
 
 const DIFF_COLORS: Record<string, string> = {
-  EASY:   "bg-green-100 text-green-700 border-green-200",
+  EASY:   "text-[#2cbb5d] bg-[rgba(44,187,93,0.1)] border-[rgba(44,187,93,0.2)]",
   MEDIUM: "bg-yellow-100 text-yellow-700 border-yellow-200",
   HARD:   "bg-red-100 text-red-700 border-red-200",
 };
@@ -348,6 +349,11 @@ export default function PlanRoadmapPage() {
     return hours > 0 ? `~${hours}h ${mins}m` : `~${mins}m`;
   };
 
+  const problemEstimatedTime = (problem: PlanProblem["problem"]) => {
+    const timeMap = ESTIMATED_TIME[plan.experienceLevel] ?? ESTIMATED_TIME.INTERMEDIATE;
+    return timeMap[problem.difficulty] ?? 30;
+  };
+
   const weekDiffDots = (problems: PlanProblem[]) => {
     const counts = { EASY: 0, MEDIUM: 0, HARD: 0 };
     problems.forEach((p) => {
@@ -504,7 +510,7 @@ export default function PlanRoadmapPage() {
               >
                 <div className="space-y-1">
                   <Link href={`/dashboard/plans/${planSlug}`} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md transition-colors hover:bg-white/5" style={{ color: "var(--text-secondary)" }}>
-                    <BarChart3 className="h-3 w-3" /> Dashboard
+                    <LayoutDashboard className="h-3 w-3" /> Dashboard
                   </Link>
                   <Link href={`/dashboard/plans/${planSlug}/analytics`} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md transition-colors hover:bg-white/5" style={{ color: "var(--text-secondary)" }}>
                     <BarChart3 className="h-3 w-3" /> Analytics
@@ -592,13 +598,13 @@ export default function PlanRoadmapPage() {
           
           if (diff >= 5) {
             return (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm mb-2">
-                <Rocket className="w-5 h-5 text-green-400 shrink-0" />
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[rgba(44,187,93,0.1)] border border-[rgba(44,187,93,0.2)] text-sm mb-2">
+                <Zap className="w-5 h-5 text-[var(--success)] shrink-0" />
                 <div>
-                  <span className="text-green-400 font-semibold">
+                  <span className="text-[var(--success)] font-semibold">
                     {diff} problems ahead of schedule!
                   </span>
-                  <span className="text-green-300/60 ml-2">
+                  <span className="text-[var(--success)]/60 ml-2">
                     At this pace you'll finish {Math.round(diff / (totalP / plan.timelineWeeks / 7))} days early.
                   </span>
                 </div>
@@ -732,8 +738,8 @@ export default function PlanRoadmapPage() {
                                 className={cn(
                                   "h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
                                   pp.status === "SOLVED"
-                                    ? "bg-green-500 border-green-500 text-white"
-                                    : "border-muted-foreground/30 hover:border-green-500"
+                                    ? "bg-[var(--accent)] border-[var(--accent)] text-[#1a1a1a]"
+                                    : "border-muted-foreground/30 hover:border-[var(--accent)]"
                                 )}
                               >
                                 {pp.status === "SOLVED" && (
@@ -764,9 +770,19 @@ export default function PlanRoadmapPage() {
                                   )}>
                                     {pp.problem.difficulty.charAt(0) + pp.problem.difficulty.slice(1).toLowerCase()}
                                   </span>
-                                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                    {pp.problem.acceptanceRate.toFixed(1)}% accepted
+                                  <span className="text-xs flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
+                                    <Clock className="h-3 w-3" />
+                                    {problemEstimatedTime(pp.problem)}m
                                   </span>
+                                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                    · {pp.problem.acceptanceRate.toFixed(1)}%
+                                  </span>
+                                  {pp.problem.likes > 0 && (
+                                    <span className="text-xs flex items-center gap-0.5" style={{ color: "var(--text-muted)" }}>
+                                      <ThumbsUp className="h-3 w-3" />
+                                      {pp.problem.likes >= 1000 ? `${(pp.problem.likes / 1000).toFixed(1)}k` : pp.problem.likes}
+                                    </span>
+                                  )}
                                   {pp.problem.tags.slice(0, 2).map((t) => (
                                     <span key={t.name} className="text-xs" style={{ color: "var(--text-muted)" }}>
                                       · {t.name}
@@ -781,6 +797,11 @@ export default function PlanRoadmapPage() {
                                     {c.company.name}
                                   </Badge>
                                 ))}
+                                {pp.problem.companies.length > 2 && (
+                                  <span className="text-xs hidden sm:flex" style={{ color: "var(--text-muted)" }}>
+                                    +{pp.problem.companies.length - 2}
+                                  </span>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -844,7 +865,7 @@ export default function PlanRoadmapPage() {
           {/* Shower confetti — full screen falling pieces */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {[...Array(40)].map((_, i) => {
-              const colors = ["#7c3aed","#2563eb","#10b981","#f59e0b","#ef4444","#ec4899","#06b6d4","#f97316"];
+              const colors = ["#86868b","#a1a1a6","#d2d2d7","#10b981","#f59e0b","#ef4444","#ec4899","#f97316"];
               const shapes = ["50%", "2px", "0"];
               return (
                 <div
@@ -871,7 +892,7 @@ export default function PlanRoadmapPage() {
               const distance = 80 + Math.random() * 180;
               const tx = Math.cos((angle * Math.PI) / 180) * distance;
               const ty = Math.sin((angle * Math.PI) / 180) * distance;
-              const colors = ["#7c3aed","#2563eb","#10b981","#f59e0b","#ef4444","#ec4899","#8b5cf6","#06b6d4"];
+              const colors = ["#86868b","#a1a1a6","#d2d2d7","#10b981","#f59e0b","#ef4444","#ec4899","#f97316"];
               const sizes = ["50%", "30%", "10%"];
               return (
                 <div
@@ -919,12 +940,12 @@ export default function PlanRoadmapPage() {
               
               if (savedDays >= 2) {
                 return (
-                  <div className="mt-3 mb-4 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20">
-                    <p className="text-green-400 font-semibold text-sm flex items-center gap-1.5">
-                      <Rocket className="w-4 h-4" />
+                  <div className="mt-3 mb-4 px-4 py-3 rounded-xl bg-[rgba(44,187,93,0.1)] border border-[rgba(44,187,93,0.2)]">
+                    <p className="text-[var(--success)] font-semibold text-sm flex items-center gap-1.5">
+                      <Zap className="w-4 h-4" />
                       {savedDays} days ahead of schedule!
                     </p>
-                    <p className="text-green-300/60 text-xs mt-1">
+                    <p className="text-[var(--success)]/60 text-xs mt-1">
                       At this pace, you'll finish your entire plan early.
                     </p>
                   </div>

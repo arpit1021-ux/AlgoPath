@@ -1,8 +1,30 @@
 import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { Plus, Rocket } from "lucide-react";
+import { Plus } from "lucide-react";
 import { PlanCard } from "@/components/plan-card";
+
+function InfinityLogo({ className = "w-10 h-10" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" fill="none">
+      <rect width="100" height="100" rx="20" fill="url(#empty-logo)" />
+      <path
+        d="M50,30 C50,15 30,15 30,30 C30,45 50,45 50,30 C50,15 70,15 70,30 C70,45 50,45 50,30 Z"
+        stroke="white"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <defs>
+        <linearGradient id="empty-logo" x1="0" y1="0" x2="100" y2="100">
+          <stop offset="0%" stopColor="#ffa116" />
+          <stop offset="100%" stopColor="#ff6b35" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
 
 export default async function DashboardPage() {
   const { userId: clerkId } = await auth();
@@ -35,7 +57,13 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Welcome */}
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+        <h1
+          className="text-2xl font-bold"
+          style={{
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+          }}
+        >
           {clerkUser?.firstName ? `Hey, ${clerkUser.firstName}` : "Your Plans"}
         </h1>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
@@ -43,7 +71,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Plans Grid — Netflix style */}
+      {/* Plans Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {plans.map((plan) => (
           <PlanCard
@@ -61,12 +89,19 @@ export default async function DashboardPage() {
         {/* Create new plan card */}
         <Link
           href="/dashboard/plans/new"
-          className="group aspect-[3/4] rounded-2xl border-2 border-dashed border-[var(--border)] hover:border-primary/40 bg-transparent hover:bg-primary/5 transition-all duration-200 flex flex-col items-center justify-center gap-3"
+          className="group aspect-[3/4] rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center gap-3 hover:border-[var(--border-hover)] hover:shadow-md"
+          style={{ borderColor: "var(--border)", background: "transparent" }}
         >
-          <div className="w-12 h-12 rounded-xl bg-white/[0.04] group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-            <Plus className="w-6 h-6 text-[var(--muted-foreground)] group-hover:text-primary transition-colors" />
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+            style={{ background: "var(--bg-input)" }}
+          >
+            <Plus className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
           </div>
-          <span className="text-xs font-medium text-[var(--muted-foreground)] group-hover:text-primary transition-colors">
+          <span
+            className="text-xs font-medium transition-colors"
+            style={{ color: "var(--text-muted)" }}
+          >
             New Plan
           </span>
         </Link>
@@ -75,13 +110,19 @@ export default async function DashboardPage() {
       {/* Empty state */}
       {plans.length === 0 && (
         <div className="text-center py-16">
-          <div className="w-20 h-20 rounded-2xl bg-[rgba(139,92,246,0.06)] flex items-center justify-center mx-auto mb-6">
-            <Rocket className="w-10 h-10 text-[#8b5cf6]" />
+          <div className="flex justify-center mb-6">
+            <InfinityLogo className="w-16 h-16" />
           </div>
-          <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">
+          <h3
+            className="text-xl font-semibold mb-2"
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-space-grotesk), 'Space Grotesk', system-ui, sans-serif",
+            }}
+          >
             No plans yet
           </h3>
-          <p className="text-sm text-[var(--muted-foreground)] max-w-sm mx-auto mb-6">
+          <p className="text-sm max-w-sm mx-auto mb-6" style={{ color: "var(--text-secondary)" }}>
             Create your first preparation plan to get a personalized roadmap
             tailored to your target companies and timeline.
           </p>

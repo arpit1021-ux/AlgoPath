@@ -33,6 +33,8 @@ enum PlanStatus {
   PAUSED
   COMPLETED
   ARCHIVED
+  GENERATING
+  FAILED
 }
 
 enum ProblemStatus {

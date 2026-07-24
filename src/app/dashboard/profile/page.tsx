@@ -145,7 +145,7 @@ export default async function ProfilePage() {
             style={{ borderColor: "var(--accent-border)" }}
           />
         ) : (
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#7c3aed] to-[#2563eb] flex items-center justify-center border-2" style={{ borderColor: "var(--accent-border)" }}>
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#424245] to-[#6e6e73] flex items-center justify-center border-2" style={{ borderColor: "var(--accent-border)" }}>
             <User className="h-10 w-10 text-white" />
           </div>
         )}
@@ -178,7 +178,7 @@ export default async function ProfilePage() {
                 className="h-16 w-16 rounded-xl object-cover ring-2 ring-border"
               />
             ) : (
-              <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+              <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-[#424245] to-[#6e6e73] flex items-center justify-center">
                 <User className="h-8 w-8 text-white" />
               </div>
             )}

@@ -100,12 +100,17 @@ export async function generateRoadmap(
       ? undefined
       : { some: { name: { in: input.selectedTopics } } };
 
+  // Estimate how many problems we need: ~2 per hour of study
+  const estimatedNeeded = Math.min(1000, totalWeeks * weeklyMinutes * 2);
+
   // Single efficient query — no nested company includes
   const allProblems = await db.problem.findMany({
     where: {
       isPremium: false,
       ...(topicFilter ? { tags: topicFilter } : {}),
     },
+    take: estimatedNeeded,
+    orderBy: { likes: "desc" },
     select: {
       id: true,
       title: true,
@@ -121,42 +126,27 @@ export async function generateRoadmap(
   });
 
   // Get company-prioritized problem IDs with ordered priority
-  // First selected company gets highest score, second gets less, etc.
   const companyProblemScores = new Map<string, number>();
   if (input.targetCompanies.length > 0) {
+    // Single query: fetch frequency + company slug together
     const companyRows = await db.companyProblemFrequency.findMany({
       where: { company: { slug: { in: input.targetCompanies } } },
-      select: { problemId: true, companyId: true, frequency: true },
+      select: {
+        problemId: true,
+        frequency: true,
+        company: { select: { slug: true } },
+      },
       orderBy: { frequency: "desc" },
     });
 
-    for (const row of companyRows) {
-      const companyIdx = input.targetCompanies.indexOf(
-        // Need to look up slug from companyId — but we can use the set approach
-        // Actually we have the companyId, need to map back
-        row.companyId
-      );
-      // Since companyRows don't have slug, we'll do a second pass
-    }
-
-    // Build a map: companyId → priority index (0 = highest)
     const companySlugToPriority = new Map<string, number>();
     input.targetCompanies.forEach((slug, idx) => {
       companySlugToPriority.set(slug, idx);
     });
 
-    // Fetch company slugs for the frequency records
-    const companyIds = [...new Set(companyRows.map((r) => r.companyId))];
-    const companySlugRows = await db.company.findMany({
-      where: { id: { in: companyIds } },
-      select: { id: true, slug: true },
-    });
-    const companyIdToSlug = new Map(companySlugRows.map((c) => [c.id, c.slug]));
-
     for (const row of companyRows) {
-      const slug = companyIdToSlug.get(row.companyId);
-      const priority = slug ? companySlugToPriority.get(slug) ?? 99 : 99;
-      const baseScore = 100 - priority * 15; // 1st=100, 2nd=85, 3rd=70, etc.
+      const priority = companySlugToPriority.get(row.company.slug) ?? 99;
+      const baseScore = 100 - priority * 15;
       const existing = companyProblemScores.get(row.problemId) ?? 0;
       companyProblemScores.set(row.problemId, Math.max(existing, baseScore));
     }
@@ -174,12 +164,12 @@ export async function generateRoadmap(
     }))
     .sort((a, b) => b.score - a.score);
 
-  // Pre-bucket by difficulty for O(1) lookup
-  const byDiff: Record<string, typeof scoredProblems> = {
-    EASY:   scoredProblems.filter((p) => p.difficulty === "EASY"),
-    MEDIUM: scoredProblems.filter((p) => p.difficulty === "MEDIUM"),
-    HARD:   scoredProblems.filter((p) => p.difficulty === "HARD"),
-  };
+  // Single-pass difficulty bucketing
+  const byDiff: Record<string, typeof scoredProblems> = { EASY: [], MEDIUM: [], HARD: [] };
+  for (const p of scoredProblems) {
+    const bucket = byDiff[p.difficulty];
+    if (bucket) bucket.push(p);
+  }
   const usedIdx: Record<string, number> = { EASY: 0, MEDIUM: 0, HARD: 0 };
 
   const roadmap: Roadmap = {
@@ -249,9 +239,6 @@ export async function generateRoadmap(
     roadmap.totalEstimatedMinutes += totalEstimated;
   }
 
-  // Batch insert — much faster than one-by-one creates
-  await db.planProblem.deleteMany({ where: { planId } });
-
   const allPlanProblems = roadmap.weeks.flatMap((week) =>
     week.problems.map((p) => ({
       planId,
@@ -262,7 +249,11 @@ export async function generateRoadmap(
     }))
   );
 
-  await db.planProblem.createMany({ data: allPlanProblems });
+  // Batch insert in a transaction
+  await db.$transaction([
+    db.planProblem.deleteMany({ where: { planId } }),
+    db.planProblem.createMany({ data: allPlanProblems }),
+  ]);
 
   return roadmap;
 }

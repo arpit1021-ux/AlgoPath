@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,6 @@ import {
   Gauge,
   Sparkles,
   Plus,
-  BarChart3,
-  Target,
-  Scale,
-  Rocket,
 } from "lucide-react";
 
 const AnimatedStep = dynamic(
@@ -43,104 +39,193 @@ const AnimatedStep = dynamic(
   { ssr: false }
 );
 
-function LoadingExperience({ difficulty }: { difficulty: string }) {
-  const [stageIndex, setStageIndex] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+/* ─── STATE 1: Loading with step-by-step progress ─── */
 
-  const stages = [
-    { iconElement: <Search className="w-8 h-8 text-indigo-400" />, text: "Analyzing your target companies..." },
-    { iconElement: <BarChart3 className="w-8 h-8 text-indigo-400" />, text: "Scanning 914 curated problems..." },
-    { iconElement: <Scale className="w-8 h-8 text-indigo-400" />, text: "Balancing topics across weeks..." },
-    { iconElement: <Target className="w-8 h-8 text-indigo-400" />, text: "Weighting by company frequency..." },
-    { iconElement: <Calendar className="w-8 h-8 text-indigo-400" />, text: "Building your week-by-week schedule..." },
-    { iconElement: <Sparkles className="w-8 h-8 text-indigo-400" />, text: "Almost there — finalizing your roadmap..." },
+function LoadingExperience({ difficulty }: { difficulty: string }) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const steps = [
+    {
+      label: "Analyzing your preferences",
+      detail: "Reading your experience level, timeline, and company targets",
+      duration: 2000,
+    },
+    {
+      label: "Scanning problem database",
+      detail: "Filtering 914 problems by your selected companies and topics",
+      duration: 3000,
+    },
+    {
+      label: "Calculating difficulty balance",
+      detail:
+        difficulty === "VERY_HARD" || difficulty === "HARD"
+          ? "You selected Hard — prioritizing advanced problems for maximum challenge"
+          : difficulty === "VERY_EASY" || difficulty === "EASY"
+            ? "Building a confidence-first progression with approachable problems"
+            : "Balancing Easy, Medium, and Hard problems across your timeline",
+      duration: 4000,
+    },
+    {
+      label: "Scheduling your weeks",
+      detail: "Distributing problems across your timeline with topic variety",
+      duration: 3000,
+    },
+    {
+      label: "Finalizing your roadmap",
+      detail: "Almost done — saving your personalized plan",
+      duration: 2000,
+    },
   ];
 
-  const difficultyMessages: Record<string, string> = {
-    VERY_EASY: "Starting you off easy — building confidence first.",
-    EASY: "Keeping it approachable while you build momentum.",
-    MEDIUM: "Balancing challenge with steady progress.",
-    HARD: "You picked Hard — give us a moment to curate the toughest problems.",
-    VERY_HARD: "Maximum difficulty selected. This takes a bit longer to get right.",
-  };
-
   useEffect(() => {
-    const stageInterval = setInterval(() => {
-      setStageIndex((prev) => Math.min(prev + 1, stages.length - 1));
-    }, 2200);
+    const advanceStep = (stepIndex: number) => {
+      if (stepIndex >= steps.length - 1) return;
+      stepTimerRef.current = setTimeout(() => {
+        setCurrentStep(stepIndex + 1);
+        advanceStep(stepIndex + 1);
+      }, steps[stepIndex].duration);
+    };
 
-    const elapsedInterval = setInterval(() => {
+    advanceStep(0);
+
+    const elapsedTimer = setInterval(() => {
       setElapsed((prev) => prev + 1);
     }, 1000);
 
     return () => {
-      clearInterval(stageInterval);
-      clearInterval(elapsedInterval);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+      clearInterval(elapsedTimer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isTakingLong = elapsed > 40;
-  const isHardDifficulty = difficulty === "HARD" || difficulty === "VERY_HARD";
+  const progress = Math.min((currentStep / (steps.length - 1)) * 100, 95);
 
   return (
-    <div className="max-w-md w-full mx-4 text-center relative">
-      <div
-        className="absolute inset-0 loading-bg-pulse"
-        style={{
-          background: 'radial-gradient(circle at center, rgba(99,102,241,0.1), transparent 70%)',
-        }}
-      />
-      <div className="relative w-20 h-20 mx-auto mb-6">
-        <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20" />
-        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          {stages[stageIndex].iconElement}
-        </div>
-      </div>
-
-      <p
-        key={stageIndex}
-        className="text-white font-semibold text-lg mb-2 animate-in fade-in duration-300"
-      >
-        {stages[stageIndex].text}
-      </p>
-
-      {isHardDifficulty && (
-        <p className="text-indigo-300/70 text-sm mb-4">
-          {difficultyMessages[difficulty]}
+    <div className="max-w-lg w-full mx-4">
+      <div className="text-center mb-8">
+        <h2
+          className="text-xl font-bold mb-1"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Building your roadmap
+        </h2>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          Personalizing 914 problems for your exact goals
         </p>
-      )}
-
-      <div className="flex items-center justify-center gap-1.5 mb-6">
-        {stages.map((_, i) => (
-          <div
-            key={i}
-            className="h-1.5 rounded-full transition-all duration-300"
-            style={{
-              width: i === stageIndex ? '24px' : '6px',
-              background: i <= stageIndex
-                ? 'var(--accent, #6366f1)'
-                : 'rgba(255,255,255,0.15)',
-            }}
-          />
-        ))}
       </div>
 
-      {isTakingLong && (
-        <div className="px-4 py-3 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-slate-400 text-xs">
-            This is taking a bit longer than usual — we&apos;re making sure your
-            roadmap is perfectly tailored. Hang tight!
+      <div
+        className="rounded-full overflow-hidden mb-6"
+        style={{ height: "4px", background: "var(--border)" }}
+      >
+        <div
+          className="h-full rounded-full transition-all duration-700 ease-out"
+          style={{
+            width: `${progress}%`,
+            background: "linear-gradient(90deg, #86868b, #a1a1a6)",
+          }}
+        />
+      </div>
+
+      <div className="space-y-3 mb-6">
+        {steps.map((step, i) => {
+          const isDone = i < currentStep;
+          const isActive = i === currentStep;
+          const isPending = i > currentStep;
+
+          return (
+            <div
+              key={i}
+              className="flex items-start gap-3 transition-all duration-300"
+              style={{ opacity: isPending ? 0.35 : 1 }}
+            >
+              <div
+                className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                style={{
+                  background: isDone
+                    ? "var(--success)"
+                    : isActive
+                      ? "var(--accent)"
+                      : "var(--border)",
+                  transition: "background 0.3s ease",
+                }}
+              >
+                {isDone ? (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path
+                      d="M2 5l2.5 2.5L8 3"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : isActive ? (
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                ) : (
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: "var(--text-muted)" }}
+                  />
+                )}
+              </div>
+
+              <div>
+                <p
+                  className="text-sm font-medium"
+                  style={{
+                    color: isDone
+                      ? "var(--text-muted)"
+                      : isActive
+                        ? "var(--text-primary)"
+                        : "var(--text-muted)",
+                  }}
+                >
+                  {step.label}
+                </p>
+                {isActive && (
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {step.detail}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {elapsed > 15 && (
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{
+            background: "var(--accent-dim)",
+            border: "1px solid var(--accent-border)",
+          }}
+        >
+          <p className="text-xs" style={{ color: "var(--accent-text)" }}>
+            Taking longer than usual — complex roadmaps take up to 30 seconds.
+            Please don&apos;t close this tab.
           </p>
         </div>
       )}
 
-      <p className="text-slate-600 text-xs mt-4">
-        {elapsed}s elapsed
+      <p
+        className="text-center text-xs mt-4"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {elapsed}s
       </p>
     </div>
   );
 }
+
+/* ─── Wizard step definitions ─── */
 
 const steps = [
   { id: 1, title: "Experience", icon: Brain },
@@ -151,12 +236,16 @@ const steps = [
   { id: 6, title: "Difficulty", icon: Gauge },
 ];
 
+/* ─── Main component ─── */
+
 export default function NewPlanPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [planCreated, setPlanCreated] = useState(false);
+  const [createdPlanId, setCreatedPlanId] = useState<string | null>(null);
+  const [stepError, setStepError] = useState<string | null>(null);
 
   const [planName, setPlanName] = useState("");
   const [experienceLevel, setExperienceLevel] =
@@ -174,6 +263,8 @@ export default function NewPlanPage() {
   ]);
   const [difficultyPreference, setDifficultyPreference] =
     useState<DifficultyPreference>("MEDIUM");
+
+  /* ─── Company helpers ─── */
 
   const filteredCompanies = COMPANIES.filter(
     (c) =>
@@ -208,6 +299,7 @@ export default function NewPlanPage() {
         : [...prev, companyId]
     );
     setCompanySearch("");
+    setStepError(null);
   };
 
   const getCompanyName = (slug: string) => {
@@ -223,16 +315,50 @@ export default function NewPlanPage() {
     setSelectedTopics((prev) =>
       prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
     );
+    setStepError(null);
   };
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
+  /* ─── STATE 4: Step validation ─── */
+
+  const getStepError = (step: number): string | null => {
+    switch (step) {
+      case 1:
+        if (!planName.trim())
+          return "Please enter a name for your plan.";
+        return null;
+      case 2:
+        if (!timelineWeeks || timelineWeeks < 1)
+          return "Please set a study duration.";
+        return null;
+      case 3:
+        if (!weeklyHours || weeklyHours < 1)
+          return "Please set your weekly study hours.";
+        return null;
+      case 4:
+        return null;
+      case 5:
+        return null;
+      case 6:
+        if (!difficultyPreference)
+          return "Please select a difficulty preference.";
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  /* ─── STATE 3: Error handling ─── */
+
+  const handleSubmit = async () => {
+    setError(null);
+    setSubmitting(true);
+
     try {
-      const response = await fetch("/api/plans", {
+      const res = await fetch("/api/plans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: planName || "My Interview Plan",
+          name: planName.trim() || "My Interview Plan",
           description: "",
           experienceLevel,
           timelineWeeks,
@@ -245,29 +371,55 @@ export default function NewPlanPage() {
         }),
       });
 
-      if (response.status === 429) {
-        const data = await response.json();
-        setError(data.message || "You've created too many plans today. Please try again tomorrow.");
-        setIsGenerating(false);
+      if (res.status === 429) {
+        setError(
+          "You've created too many plans today. You can create up to 10 plans per day. Try again tomorrow."
+        );
+        setSubmitting(false);
         return;
       }
-      if (response.ok) {
-        const data = await response.json();
-        setPlanCreated(true);
-        setTimeout(() => {
-          router.push(`/dashboard/plans/${data.plan.slug}`);
-        }, 1500);
-      } else {
-        const data = await response.json().catch(() => ({}));
-        setError(data.detail || data.error || "Failed to create plan. Please try again.");
-        setIsGenerating(false);
+
+      if (res.status === 400) {
+        const data = await res.json();
+        setError(
+          `Some information is missing or invalid: ${data.details ? Object.values(data.details.fieldErrors ?? {}).flat().join(", ") : "Please check your inputs and try again."}`
+        );
+        setSubmitting(false);
         return;
       }
-    } catch (error) {
-      console.error("Failed to create plan:", error);
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setIsGenerating(false);
+
+      if (res.status === 503) {
+        setError(
+          "Our problem database is being set up. This usually takes a minute. Please try again in 60 seconds."
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(
+          data.detail ||
+            data.error ||
+            "We couldn't create your plan right now. This might be a temporary issue — please try again in a moment."
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const data = await res.json();
+      setSubmitting(false);
+      setPlanCreated(true);
+      setCreatedPlanId(data.plan.id);
+      setTimeout(
+        () => router.push(`/dashboard/plans/${data.plan.id}`),
+        1000
+      );
+    } catch {
+      setError(
+        "Connection failed. Please check your internet connection and try again."
+      );
+      setSubmitting(false);
     }
   };
 
@@ -282,31 +434,103 @@ export default function NewPlanPage() {
     }
   };
 
+  const handleNext = () => {
+    const err = getStepError(currentStep);
+    if (err) {
+      setStepError(err);
+      return;
+    }
+    setStepError(null);
+    setCurrentStep((s) => Math.min(6, s + 1));
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>Create New Plan</h1>
+        <h1
+          className="text-3xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Create New Plan
+        </h1>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
           Set up your personalized interview preparation roadmap.
         </p>
       </div>
 
+      {/* Persistent error banner */}
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
-          {error}
+        <div
+          className="rounded-xl px-4 py-3 flex items-start gap-3"
+          style={{
+            background: "var(--danger-dim)",
+            border: "1px solid rgba(239,68,68,0.25)",
+          }}
+        >
+          <div
+            className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+            style={{ background: "var(--danger)" }}
+          >
+            <span className="text-white text-xs font-bold">!</span>
+          </div>
+          <div className="flex-1">
+            <p
+              className="text-sm font-medium mb-0.5"
+              style={{ color: "var(--danger)" }}
+            >
+              Plan creation failed
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              {error}
+            </p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="shrink-0 text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      <div className={cn("flex flex-col gap-2", isGenerating && "pointer-events-none select-none")}>
-        <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>Step {currentStep} of {steps.length}</p>
-        <div className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 rounded-2xl" style={{ background: "var(--bg-input)", border: "1px solid var(--border)" }}>
+      {/* Step indicator */}
+      <div
+        className={cn(
+          "flex flex-col gap-2",
+          submitting && "pointer-events-none select-none"
+        )}
+      >
+        <p
+          className="text-xs text-center"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Step {currentStep} of {steps.length}
+        </p>
+        <div
+          className="flex items-center justify-between w-full overflow-x-auto gap-1 px-2 py-3 rounded-2xl"
+          style={{
+            background: "var(--bg-input)",
+            border: "1px solid var(--border)",
+          }}
+        >
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <div
                 className="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
                 style={{
-                  background: currentStep === step.id ? "var(--accent)" : currentStep > step.id ? "var(--bg-input-hover)" : "transparent",
-                  color: currentStep === step.id ? "#ffffff" : currentStep > step.id ? "var(--text-secondary)" : "var(--text-muted)",
+                  background:
+                    currentStep === step.id
+                      ? "var(--accent)"
+                      : currentStep > step.id
+                        ? "var(--bg-input-hover)"
+                        : "transparent",
+                  color:
+                    currentStep === step.id
+                      ? "#1a1a1a"
+                      : currentStep > step.id
+                        ? "var(--text-secondary)"
+                        : "var(--text-muted)",
                 }}
               >
                 {currentStep > step.id ? (
@@ -317,19 +541,32 @@ export default function NewPlanPage() {
                 <span className="hidden md:inline">{step.title}</span>
               </div>
               {index < steps.length - 1 && (
-                <div className="flex-1 h-px min-w-[12px] max-w-[40px] mx-1" style={{ background: "var(--border)" }} />
+                <div
+                  className="flex-1 h-px min-w-[12px] max-w-[40px] mx-1"
+                  style={{ background: "var(--border)" }}
+                />
               )}
             </div>
           ))}
         </div>
       </div>
 
-      <div className={cn("space-y-8", isGenerating && "pointer-events-none select-none opacity-60")}>
-      <AnimatedStep stepKey={currentStep}>
+      {/* Wizard steps */}
+      <div
+        className={cn(
+          "space-y-8",
+          submitting && "pointer-events-none select-none opacity-60"
+        )}
+      >
+        <AnimatedStep stepKey={currentStep}>
+          {/* Step 1: Experience + Plan Name */}
           {currentStep === 1 && (
-            <Card className="glass-card">
+            <Card style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <Brain className="h-5 w-5" />
                   What&apos;s your experience level?
                 </CardTitle>
@@ -339,14 +576,35 @@ export default function NewPlanPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block" style={{ color: "var(--text-primary)" }}>
+                  <label
+                    className="text-sm font-medium mb-2 block"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     Plan Name
+                    <span
+                      style={{ color: "var(--danger)", marginLeft: "2px" }}
+                    >
+                      *
+                    </span>
                   </label>
-                  <Input
-                    placeholder="e.g., Google SDE Preparation"
-                    value={planName}
-                    onChange={(e) => setPlanName(e.target.value)}
-                  />
+                  <div
+                    style={{
+                      outline:
+                        stepError && !planName.trim()
+                          ? "2px solid var(--danger)"
+                          : "none",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <Input
+                      placeholder="e.g., Google SDE Preparation"
+                      value={planName}
+                      onChange={(e) => {
+                        setPlanName(e.target.value);
+                        setStepError(null);
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   {(
@@ -357,14 +615,30 @@ export default function NewPlanPage() {
                       onClick={() => setExperienceLevel(level)}
                       className="p-4 rounded-lg border-2 text-left transition-all hover:border-primary cursor-pointer"
                       style={{
-                        borderColor: experienceLevel === level ? "var(--accent)" : "var(--border)",
-                        background: experienceLevel === level ? "var(--accent-dim)" : "var(--bg-card)",
+                        borderColor:
+                          experienceLevel === level
+                            ? "var(--accent)"
+                            : "var(--border)",
+                        background:
+                          experienceLevel === level
+                            ? "var(--accent-dim)"
+                            : "var(--bg-card)",
                       }}
                     >
-                      <div className="font-semibold capitalize" style={{ color: "var(--text-primary)" }}>{level.toLowerCase()}</div>
-                      <div className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-                        {level === "BEGINNER" && "More easy problems, fundamentals first"}
-                        {level === "INTERMEDIATE" && "Balanced mix of difficulties"}
+                      <div
+                        className="font-semibold capitalize"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {level.toLowerCase()}
+                      </div>
+                      <div
+                        className="text-sm mt-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {level === "BEGINNER" &&
+                          "More easy problems, fundamentals first"}
+                        {level === "INTERMEDIATE" &&
+                          "Balanced mix of difficulties"}
                         {level === "EXPERT" && "Hard-heavy, advanced patterns"}
                       </div>
                     </button>
@@ -374,10 +648,14 @@ export default function NewPlanPage() {
             </Card>
           )}
 
+          {/* Step 2: Timeline */}
           {currentStep === 2 && (
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <Calendar className="h-5 w-5" />
                   Interview Timeline
                 </CardTitle>
@@ -388,8 +666,16 @@ export default function NewPlanPage() {
               <CardContent className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Weeks</span>
-                    <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Weeks
+                    </span>
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {timelineWeeks} weeks
                     </span>
                   </div>
@@ -398,20 +684,36 @@ export default function NewPlanPage() {
                     min={1}
                     max={24}
                     value={timelineWeeks}
-                    onChange={(e) => setTimelineWeeks(Number(e.target.value))}
+                    onChange={(e) => {
+                      setTimelineWeeks(Number(e.target.value));
+                      setStepError(null);
+                    }}
                     className="w-full h-2 rounded-lg appearance-none cursor-pointer"
                     style={{ background: "var(--bg-input)" }}
                   />
-                  <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  <div
+                    className="flex justify-between text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     <span>1 week</span>
-                    <span style={{ color: "var(--accent-text)" }}>12 weeks</span>
+                    <span style={{ color: "var(--accent-text)" }}>
+                      12 weeks
+                    </span>
                     <span>24 weeks</span>
                   </div>
                 </div>
-                <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                <div
+                  className="p-4 rounded-lg"
+                  style={{ background: "var(--bg-input)" }}
+                >
                   <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks} weeks</strong> gives you{" "}
-                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks * weeklyHours} total hours</strong>{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {timelineWeeks} weeks
+                    </strong>{" "}
+                    gives you{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {timelineWeeks * weeklyHours} total hours
+                    </strong>{" "}
                     of study time.
                   </p>
                 </div>
@@ -419,10 +721,14 @@ export default function NewPlanPage() {
             </Card>
           )}
 
+          {/* Step 3: Hours/Week */}
           {currentStep === 3 && (
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <Clock className="h-5 w-5" />
                   Weekly Study Hours
                 </CardTitle>
@@ -433,8 +739,16 @@ export default function NewPlanPage() {
               <CardContent className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Hours/Week</span>
-                    <span className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Hours/Week
+                    </span>
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {weeklyHours} hours
                     </span>
                   </div>
@@ -443,31 +757,55 @@ export default function NewPlanPage() {
                     min={2}
                     max={40}
                     value={weeklyHours}
-                    onChange={(e) => setWeeklyHours(Number(e.target.value))}
+                    onChange={(e) => {
+                      setWeeklyHours(Number(e.target.value));
+                      setStepError(null);
+                    }}
                     className="w-full h-2 rounded-lg appearance-none cursor-pointer"
                     style={{ background: "var(--bg-input)" }}
                   />
-                  <div className="flex justify-between text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  <div
+                    className="flex justify-between text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     <span>2 hours</span>
-                    <span style={{ color: "var(--accent-text)" }}>20 hours</span>
+                    <span style={{ color: "var(--accent-text)" }}>
+                      20 hours
+                    </span>
                     <span>40 hours</span>
                   </div>
                 </div>
-                <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
+                <div
+                  className="p-4 rounded-lg"
+                  style={{ background: "var(--bg-input)" }}
+                >
                   <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    At <strong style={{ color: "var(--text-primary)" }}>{weeklyHours} hours/week</strong> for{" "}
-                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks} weeks</strong>, you&apos;ll have{" "}
-                    <strong style={{ color: "var(--text-primary)" }}>{timelineWeeks * weeklyHours} total hours</strong>
+                    At{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {weeklyHours} hours/week
+                    </strong>{" "}
+                    for{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {timelineWeeks} weeks
+                    </strong>
+                    , you&apos;ll have{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {timelineWeeks * weeklyHours} total hours
+                    </strong>
                   </p>
                 </div>
               </CardContent>
             </Card>
           )}
 
+          {/* Step 4: Companies */}
           {currentStep === 4 && (
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <Building2 className="h-5 w-5" />
                   Target Companies
                 </CardTitle>
@@ -490,14 +828,19 @@ export default function NewPlanPage() {
                         className="cursor-pointer hover:bg-destructive/10 hover:text-destructive gap-1"
                         onClick={() => toggleCompany(id)}
                       >
-                        <span className="text-xs opacity-60">#{idx + 1}</span>{" "}
+                        <span className="text-xs opacity-60">
+                          #{idx + 1}
+                        </span>{" "}
                         {getCompanyName(id)} ×
                       </Badge>
                     ))}
                   </div>
                 )}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "var(--text-muted)" }} />
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+                    style={{ color: "var(--text-muted)" }}
+                  />
                   <Input
                     placeholder="Search companies (Google, TCS, Microsoft...)"
                     value={companySearch}
@@ -506,7 +849,9 @@ export default function NewPlanPage() {
                       setShowCompanyDropdown(true);
                     }}
                     onFocus={() => setShowCompanyDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 200)}
+                    onBlur={() =>
+                      setTimeout(() => setShowCompanyDropdown(false), 200)
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && companySearch.trim()) {
                         e.preventDefault();
@@ -560,8 +905,12 @@ export default function NewPlanPage() {
                       onClick={() => toggleCompany(company.id)}
                       className="p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer"
                       style={{
-                        borderColor: selectedCompanies.includes(company.id) ? "var(--accent)" : "var(--border)",
-                        background: selectedCompanies.includes(company.id) ? "var(--accent-dim)" : "var(--bg-card)",
+                        borderColor: selectedCompanies.includes(company.id)
+                          ? "var(--accent)"
+                          : "var(--border)",
+                        background: selectedCompanies.includes(company.id)
+                          ? "var(--accent-dim)"
+                          : "var(--bg-card)",
                         color: "var(--text-primary)",
                       }}
                     >
@@ -573,10 +922,14 @@ export default function NewPlanPage() {
             </Card>
           )}
 
+          {/* Step 5: Topics */}
           {currentStep === 5 && (
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <BookOpen className="h-5 w-5" />
                   Topic Selection
                 </CardTitle>
@@ -594,6 +947,7 @@ export default function NewPlanPage() {
                       onClick={() => {
                         setTopicMode(mode);
                         if (mode === "ALL") setSelectedTopics([...TOPICS]);
+                        setStepError(null);
                       }}
                     >
                       {mode === "ALL" && "All Topics"}
@@ -610,8 +964,12 @@ export default function NewPlanPage() {
                         onClick={() => toggleTopic(topic)}
                         className="p-3 rounded-lg border text-left text-sm transition-all hover:border-primary cursor-pointer"
                         style={{
-                          borderColor: selectedTopics.includes(topic) ? "var(--accent)" : "var(--border)",
-                          background: selectedTopics.includes(topic) ? "var(--accent-dim)" : "var(--bg-card)",
+                          borderColor: selectedTopics.includes(topic)
+                            ? "var(--accent)"
+                            : "var(--border)",
+                          background: selectedTopics.includes(topic)
+                            ? "var(--accent-dim)"
+                            : "var(--bg-card)",
                           color: "var(--text-primary)",
                         }}
                       >
@@ -621,8 +979,14 @@ export default function NewPlanPage() {
                   </div>
                 )}
                 {topicMode === "RECOMMENDED" && (
-                  <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
-                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{ background: "var(--bg-input)" }}
+                  >
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       <Sparkles className="h-4 w-4 inline mr-1" />
                       Based on your selected companies, we recommend:{" "}
                       <strong style={{ color: "var(--text-primary)" }}>
@@ -633,8 +997,14 @@ export default function NewPlanPage() {
                   </div>
                 )}
                 {topicMode === "ALL" && (
-                  <div className="p-4 rounded-lg" style={{ background: "var(--bg-input)" }}>
-                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{ background: "var(--bg-input)" }}
+                  >
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       All {TOPICS.length} topics will be included in your
                       roadmap with balanced coverage.
                     </p>
@@ -644,10 +1014,14 @@ export default function NewPlanPage() {
             </Card>
           )}
 
+          {/* Step 6: Difficulty + Review */}
           {currentStep === 6 && (
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                <CardTitle
+                  className="flex items-center gap-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   <Gauge className="h-5 w-5" />
                   Difficulty Preference
                 </CardTitle>
@@ -668,22 +1042,53 @@ export default function NewPlanPage() {
                   ).map((diff) => (
                     <button
                       key={diff}
-                      onClick={() => setDifficultyPreference(diff)}
+                      onClick={() => {
+                        setDifficultyPreference(diff);
+                        setStepError(null);
+                      }}
                       className="p-4 rounded-lg border-2 text-center transition-all hover:border-primary cursor-pointer"
                       style={{
-                        borderColor: difficultyPreference === diff ? "var(--accent)" : "var(--border)",
-                        background: difficultyPreference === diff ? "var(--accent-dim)" : "var(--bg-card)",
+                        borderColor:
+                          difficultyPreference === diff
+                            ? "var(--accent)"
+                            : "var(--border)",
+                        background:
+                          difficultyPreference === diff
+                            ? "var(--accent-dim)"
+                            : "var(--bg-card)",
                       }}
                     >
-                      <div className="font-semibold text-sm" style={{ color: difficultyPreference === diff ? "var(--accent-text)" : "var(--text-primary)" }}>
+                      <div
+                        className="font-semibold text-sm"
+                        style={{
+                          color:
+                            difficultyPreference === diff
+                              ? "var(--accent-text)"
+                              : "var(--text-primary)",
+                        }}
+                      >
                         {DIFFICULTY_LABELS[diff]}
                       </div>
                     </button>
                   ))}
                 </div>
-                <div className="p-4 rounded-lg space-y-2" style={{ background: "var(--bg-input)" }}>
-                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Plan Summary</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+
+                {/* Plan summary */}
+                <div
+                  className="p-4 rounded-lg space-y-2"
+                  style={{ background: "var(--bg-input)" }}
+                >
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Plan Summary
+                  </p>
+                  <div
+                    className="grid grid-cols-2 gap-2 text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <span>Plan: {planName || "My Interview Plan"}</span>
                     <span>Experience: {experienceLevel.toLowerCase()}</span>
                     <span>Timeline: {timelineWeeks} weeks</span>
                     <span>Hours/week: {weeklyHours}h</span>
@@ -699,70 +1104,152 @@ export default function NewPlanPage() {
                     <span>
                       Difficulty: {DIFFICULTY_LABELS[difficultyPreference]}
                     </span>
+                    <span>
+                      Total: {timelineWeeks * weeklyHours}h study time
+                    </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           )}
-      </AnimatedStep>
+        </AnimatedStep>
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          className="cursor-pointer"
-          onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-          disabled={currentStep === 1}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        {currentStep < 6 ? (
-          <Button
-            className="cursor-pointer"
-            onClick={() => setCurrentStep((s) => Math.min(6, s + 1))}
-            disabled={!canProceed()}
+        {/* Step validation error */}
+        {stepError && (
+          <div
+            className="rounded-lg px-3 py-2 flex items-center gap-2"
+            style={{
+              background: "var(--danger-dim)",
+              border: "1px solid rgba(239,68,68,0.2)",
+            }}
           >
-            Next
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            size="lg"
-            className="cursor-pointer bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg shadow-primary/20"
-          >
-            {isGenerating ? (
-              <>
-                <Sparkles className="h-4 w-4 mr-2 animate-spin" />
-                Generating Roadmap...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Roadmap
-              </>
-            )}
-          </Button>
+            <span
+              className="w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+              style={{ background: "var(--danger)", fontSize: "10px" }}
+            >
+              !
+            </span>
+            <p className="text-xs" style={{ color: "var(--danger)" }}>
+              {stepError}
+            </p>
+          </div>
         )}
-      </div>
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => {
+              setStepError(null);
+              setError(null);
+              setCurrentStep((s) => Math.max(1, s - 1));
+            }}
+            disabled={currentStep === 1 || submitting}
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          {currentStep < 6 ? (
+            <Button
+              className="cursor-pointer"
+              onClick={handleNext}
+              disabled={!canProceed() || submitting}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting}
+              size="lg"
+              className="cursor-pointer bg-[#1d1d1f] hover:bg-[#424245] text-white shadow-lg"
+            >
+              {submitting ? (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Roadmap
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {isGenerating && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-md"
-          style={{ background: 'rgba(0,0,0,0.85)' }}
+      {/* STATE 1: Loading overlay */}
+      {submitting && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm"
+          style={{ background: "rgba(0,0,0,0.85)" }}
         >
           <LoadingExperience difficulty={difficultyPreference} />
         </div>
       )}
 
+      {/* STATE 2: Success overlay */}
       {planCreated && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
-          <div className="mb-2">
-            <Rocket className="w-12 h-12 mx-auto" style={{ color: "var(--accent-text)" }} />
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm"
+          style={{ background: "rgba(0,0,0,0.85)" }}
+        >
+          <div className="text-center max-w-sm mx-4">
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{
+                background: "var(--success-dim)",
+                border: "2px solid var(--success)",
+                animation: "scale-in 0.3s ease-out",
+              }}
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 32 32"
+                fill="none"
+              >
+                <path
+                  d="M8 16l6 6 10-12"
+                  stroke="#10b981"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    strokeDasharray: "40",
+                    animation: "draw-check 0.4s ease-out 0.2s both",
+                  }}
+                />
+              </svg>
+            </div>
+
+            <h2
+              className="text-2xl font-bold mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Plan created!
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+              Taking you to your roadmap — it will be ready in seconds.
+            </p>
+
+            <div
+              className="mt-6 rounded-full overflow-hidden"
+              style={{ height: "2px", background: "var(--border)" }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  background: "var(--success)",
+                  animation: "fill-bar 1s linear forwards",
+                }}
+              />
+            </div>
           </div>
-          <p className="text-white font-bold text-xl">Your roadmap is ready!</p>
-          <p className="text-slate-400 text-sm">Redirecting you now...</p>
         </div>
       )}
     </div>

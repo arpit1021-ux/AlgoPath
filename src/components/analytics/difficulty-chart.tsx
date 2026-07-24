@@ -40,10 +40,10 @@ export function DifficultyChart({ data }: DifficultyChartProps) {
             fontSize: "13px",
           }}
           labelStyle={{ color: textSecondary }}
-          cursor={{ fill: "rgba(99,102,241,0.05)" }}
+          cursor={{ fill: "rgba(134,134,139,0.05)" }}
         />
-        <Bar dataKey="total" fill="rgba(99,102,241,0.2)" radius={[4, 4, 0, 0]} name="Assigned" />
-        <Bar dataKey="solved" fill="#6366f1" radius={[4, 4, 0, 0]} name="Solved" />
+        <Bar dataKey="total" fill="rgba(134,134,139,0.2)" radius={[4, 4, 0, 0]} name="Assigned" />
+        <Bar dataKey="solved" fill="#a1a1a6" radius={[4, 4, 0, 0]} name="Solved" />
       </BarChart>
     </ResponsiveContainer>
   );

@@ -13,10 +13,10 @@ import {
   RotateCcw,
   ChevronRight,
   Flame,
-  Rocket,
   Zap,
 } from "lucide-react";
 import { ProgressBar, DifficultyBadge } from "@/components/ui-custom";
+import { GeneratingPlan } from "@/components/generating-plan";
 import { cn } from "@/lib/utils";
 
 export default async function PlanDashboardPage({
@@ -33,7 +33,11 @@ export default async function PlanDashboardPage({
   if (!user) redirect("/login");
 
   let plan = await db.plan.findFirst({
-    where: { slug: planSlug, userId: user.id, deletedAt: null },
+    where: {
+      OR: [{ slug: planSlug }, { id: planSlug }],
+      userId: user.id,
+      deletedAt: null,
+    },
     select: {
       id: true,
       slug: true,
@@ -65,42 +69,18 @@ export default async function PlanDashboardPage({
     },
   });
 
-  if (!plan) {
-    plan = await db.plan.findFirst({
-      where: { id: planSlug, userId: user.id, deletedAt: null },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        status: true,
-        experienceLevel: true,
-        timelineWeeks: true,
-        weeklyHours: true,
-        createdAt: true,
-        targetCompanies: {
-          select: { company: { select: { name: true } } },
-        },
-        problems: {
-          select: {
-            id: true,
-            weekNumber: true,
-            order: true,
-            status: true,
-            problem: {
-              select: {
-                title: true,
-                titleSlug: true,
-                difficulty: true,
-              },
-            },
-          },
-          orderBy: [{ weekNumber: "asc" }, { order: "asc" }],
-        },
-      },
-    });
-  }
-
   if (!plan) redirect("/dashboard");
+
+  if (plan.status === "GENERATING" || plan.status === "FAILED") {
+    return (
+      <div className="space-y-6">
+        <div className="p-6 relative overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-sm)" }}>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>{plan.name}</h1>
+        </div>
+        <GeneratingPlan planId={plan.id} />
+      </div>
+    );
+  }
 
   const totalProblems = plan.problems.length;
   const solvedProblems = plan.problems.filter((p) => p.status === "SOLVED").length;
@@ -155,7 +135,7 @@ export default async function PlanDashboardPage({
     if (paceDiff >= 5) {
       return (
         <div className="flex items-center gap-3 px-5 py-4 rounded-xl" style={{ background: "var(--success-dim)", border: "1px solid var(--success)" }}>
-          <Rocket className="w-6 h-6 shrink-0" style={{ color: "var(--success)" }} />
+          <Zap className="w-6 h-6 shrink-0" style={{ color: "var(--success)" }} />
           <div>
             <p className="font-semibold text-sm" style={{ color: "var(--success)" }}>
               {paceDiff} problems ahead of schedule!
@@ -275,8 +255,8 @@ export default async function PlanDashboardPage({
               <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
               Overall
             </span>
-            <div className="w-8 h-8 rounded-lg bg-[rgba(139,92,246,0.08)] flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-[#8b5cf6]" />
+            <div className="w-8 h-8 rounded-lg bg-[rgba(134,134,139,0.08)] flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-[#a1a1a6]" />
             </div>
           </div>
           <div className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>{overallProgress}%</div>
@@ -309,8 +289,8 @@ export default async function PlanDashboardPage({
           style={{ border: "1px solid var(--border)", background: "var(--bg-card)", boxShadow: "var(--shadow-sm)" }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[rgba(139,92,246,0.1)] flex items-center justify-center">
-              <Play className="w-4 h-4 text-[#8b5cf6]" />
+            <div className="w-9 h-9 rounded-lg bg-[rgba(134,134,139,0.1)] flex items-center justify-center">
+              <Play className="w-4 h-4 text-[#a1a1a6]" />
             </div>
             <div>
               <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Roadmap</p>
@@ -436,7 +416,7 @@ export default async function PlanDashboardPage({
                 {weekProblems.length > 6 && (
                   <Link
                     href={`/dashboard/plans/${plan.slug}/roadmap`}
-                    className="w-full px-6 py-3 text-xs font-medium text-[#8b5cf6] hover:underline text-left block"
+                    className="w-full px-6 py-3 text-xs font-medium text-[#a1a1a6] hover:underline text-left block"
                   >
                     View all {weekTotal} problems →
                   </Link>
