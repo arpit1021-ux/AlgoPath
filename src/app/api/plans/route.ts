@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { slugify, generatePlanSlug } from "@/lib/utils";
 import { planCreationLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
+import { seedProblems } from "@/lib/seed";
 
 async function getOrCreateUser(clerkId: string) {
   return db.user.upsert({
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     const problemCount = await db.problem.count();
     if (problemCount < 700) {
       // Fire-and-forget seed — don't block the user
-      import("@/app/api/seed/route").then(m => m.seedProblems()).catch(() => {});
+      seedProblems().catch(() => {});
       // Wait briefly for seed to complete if this is first request
       await new Promise(r => setTimeout(r, 2000));
     }
