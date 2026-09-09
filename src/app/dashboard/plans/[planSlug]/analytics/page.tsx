@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -15,6 +14,8 @@ import {
   Building2, Calendar, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { AnalyticsSkeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-message";
+import { useApiData } from "@/lib/use-api-data";
 
 const DifficultyChart = dynamic(
   () => import("@/components/analytics/difficulty-chart").then((m) => m.DifficultyChart),
@@ -86,20 +87,22 @@ const READINESS_ITEMS = [
 export default function AnalyticsPage() {
   const params = useParams();
   const planSlug = params.planSlug as string;
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/analytics?planSlug=${planSlug}`)
-      .then((r) => r.json())
-      .then((data) => { if (!cancelled) setAnalytics(data); })
-      .catch(console.error)
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [planSlug]);
+  const {
+    data: analytics,
+    loading,
+    error,
+    retry,
+  } = useApiData<AnalyticsData>(`/api/analytics?planSlug=${planSlug}`, [planSlug]);
 
   if (loading) return <AnalyticsSkeleton />;
+
+  if (error) {
+    return (
+      <div className="max-w-lg mx-auto py-16">
+        <ErrorState title={error.title} message={error.message} onRetry={retry} />
+      </div>
+    );
+  }
 
   if (!analytics || !analytics.readiness) {
     return (

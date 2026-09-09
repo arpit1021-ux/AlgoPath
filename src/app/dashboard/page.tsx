@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { Plus } from "lucide-react";
 import { PlanCard } from "@/components/plan-card";
 
@@ -26,32 +26,39 @@ function InfinityLogo({ className = "w-10 h-10" }: { className?: string }) {
   );
 }
 
+export const metadata = {
+  title: "My Plans",
+  description: "Every preparation plan you\u2019re running, with progress at a glance.",
+};
+
 export default async function DashboardPage() {
   const { userId: clerkId } = await auth();
-  const clerkUser = await currentUser();
 
-  const user = clerkId
-    ? await db.user.findUnique({ where: { clerkId } })
-    : null;
-
-  const plans = user
-    ? await db.plan.findMany({
-        where: { userId: user.id, deletedAt: null },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          status: true,
-          targetCompanies: {
-            select: { company: { select: { name: true } } },
+  // currentUser() is a network call to Clerk and the plan query is a call to
+  // Postgres — they do not depend on each other, so run them together instead
+  // of one after the other. Filtering on the user relation also removes the
+  // separate clerkId -> user lookup that used to sit in between.
+  const [clerkUser, plans] = await Promise.all([
+    currentUser(),
+    clerkId
+      ? db.plan.findMany({
+          where: { user: { clerkId }, deletedAt: null },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            status: true,
+            targetCompanies: {
+              select: { company: { select: { name: true } } },
+            },
+            problems: {
+              select: { id: true, status: true },
+            },
           },
-          problems: {
-            select: { id: true, status: true },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+          orderBy: { createdAt: "desc" },
+        })
+      : [],
+  ]);
 
   return (
     <div className="space-y-8">
@@ -71,7 +78,8 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Plans Grid */}
+      {/* Plans Grid — hidden when empty so the empty state owns the screen */}
+      {plans.length > 0 && (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {plans.map((plan) => (
           <PlanCard
@@ -106,6 +114,7 @@ export default async function DashboardPage() {
           </span>
         </Link>
       </div>
+      )}
 
       {/* Empty state */}
       {plans.length === 0 && (

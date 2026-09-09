@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { analyticsLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import { calculateReadinessScore, detectWeakTopics } from "@/lib/readiness-score";
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
+    const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

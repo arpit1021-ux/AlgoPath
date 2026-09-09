@@ -212,27 +212,60 @@ export const COMPANIES = [
   { id: "mongodb", name: "MongoDB", slug: "mongodb" },
 ] as const;
 
+// These strings are matched against the `name` column of stored problem tags.
+// They must be the vocabulary the data actually uses: "Linked Lists" not
+// "Linked List", "Tries" not "Trie", and BFS and DFS separately — picking a
+// name that no problem carries silently filters the roadmap down to nothing.
 export const TOPICS = [
   "Arrays",
   "Strings",
   "Hashing",
-  "Linked List",
+  "Math",
+  "Sorting",
+  "Prefix Sum",
+  "Two Pointers",
+  "Sliding Window",
+  "Binary Search",
   "Stack",
   "Queue",
+  "Linked Lists",
+  "Design",
   "Trees",
-  "Graphs",
   "Heap",
-  "Trie",
+  "Tries",
+  "Recursion",
+  "BFS",
+  "DFS",
+  "Graphs",
+  "Matrix",
+  "Union Find",
+  "Greedy",
+  "Backtracking",
+  "Bit Manipulation",
+  "Dynamic Programming",
+] as const;
+
+/**
+ * The "Recommended" wizard preset: the patterns that carry most interview
+ * questions. A subset of TOPICS, so it uses the same stored tag vocabulary.
+ */
+export const RECOMMENDED_TOPICS = [
+  "Arrays",
+  "Hashing",
+  "Strings",
+  "Two Pointers",
+  "Sliding Window",
+  "Binary Search",
+  "Stack",
+  "Linked Lists",
+  "Trees",
+  "Heap",
+  "DFS",
+  "BFS",
+  "Graphs",
   "Greedy",
   "Backtracking",
   "Dynamic Programming",
-  "Sliding Window",
-  "Binary Search",
-  "Bit Manipulation",
-  "Math",
-  "Two Pointers",
-  "Sorting",
-  "BFS/DFS",
 ] as const;
 
 export const DIFFICULTY_LABELS: Record<string, string> = {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { slugify, generatePlanSlug } from "@/lib/utils";
 import { planCreationLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
+    const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -86,15 +86,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await getOrCreateUser(clerkId);
+    // The problem count does not depend on the user, so fetch both at once.
+    const [user, problemCount] = await Promise.all([
+      getOrCreateUser(clerkId),
+      db.problem.count(),
+    ]);
 
-    const recentDuplicate = await db.plan.findFirst({
-      where: {
-        userId: user.id,
-        name: parsed.data.name,
-        createdAt: { gte: new Date(Date.now() - 10000) },
-      },
-    });
+    const { name, description, experienceLevel, timelineWeeks, weeklyHours, targetCompanies, topicMode, selectedTopics, difficultyPreference } = parsed.data;
+
+    let slug = generatePlanSlug(name);
+
+    // The duplicate check and the slug check are independent of each other —
+    // one round trip instead of two.
+    const [recentDuplicate, existing] = await Promise.all([
+      db.plan.findFirst({
+        where: {
+          userId: user.id,
+          name,
+          createdAt: { gte: new Date(Date.now() - 10000) },
+        },
+        select: { id: true, name: true },
+      }),
+      db.plan.findFirst({
+        where: { userId: user.id, slug },
+        select: { id: true },
+      }),
+    ]);
+
     if (recentDuplicate) {
       return NextResponse.json(
         { plan: { id: recentDuplicate.id, name: recentDuplicate.name } },
@@ -102,24 +120,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (existing) {
+      slug = `${slug}-${Date.now().toString(36)}`;
+    }
+
     // Quick check: if no problems exist, seed in background (non-blocking)
-    const problemCount = await db.problem.count();
     if (problemCount < 700) {
       // Fire-and-forget seed — don't block the user
       seedProblems().catch(() => {});
       // Wait briefly for seed to complete if this is first request
       await new Promise(r => setTimeout(r, 2000));
-    }
-
-    const { name, description, experienceLevel, timelineWeeks, weeklyHours, targetCompanies, topicMode, selectedTopics, difficultyPreference } = parsed.data;
-
-    let slug = generatePlanSlug(name);
-    const existing = await db.plan.findFirst({
-      where: { userId: user.id, slug },
-      select: { id: true },
-    });
-    if (existing) {
-      slug = `${slug}-${Date.now().toString(36)}`;
     }
 
     const plan = await db.plan.create({
@@ -173,8 +183,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ plan: { id: plan.id, name: plan.name, slug: plan.slug } }, { status: 201 });
   } catch (error) {
+    // Logged server-side only. Never return raw error text to the client:
+    // it is unreadable to users and leaks schema internals.
     logError(error, { route: "POST /api/plans" });
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: "Failed to create plan", detail: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create plan" }, { status: 500 });
   }
 }

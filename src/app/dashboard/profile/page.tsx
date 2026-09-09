@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import {
   Card,
   CardContent,
@@ -15,6 +15,11 @@ import { User, Trophy, Target, Flame, CheckCircle2, RotateCcw, Lock, Sword, Shie
 import { ProgressBar } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 
+export const metadata = {
+  title: "Profile",
+  description: "Your account and overall preparation stats.",
+};
+
 export default async function ProfilePage() {
   const clerkUser = await currentUser();
   const { userId: clerkId } = await auth();
@@ -27,7 +32,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const user = await db.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
 
   if (!user) {
     return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { showToast } from "@/components/ui/toast";
+import { ErrorState } from "@/components/ui/error-message";
+import { mutate, type ApiError } from "@/lib/use-api-data";
 import {
   ExternalLink,
   CheckCircle2,
@@ -113,6 +115,7 @@ export default function PlanRoadmapPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [activeTopicFilter, setActiveTopicFilter] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarSections, setSidebarSections] = useState<Record<string, boolean>>({
@@ -127,34 +130,45 @@ export default function PlanRoadmapPage() {
   };
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
+  const [noteStatus, setNoteStatus] = useState<
+    Record<string, "idle" | "saving" | "saved" | "error">
+  >({});
   const [celebrationWeek, setCelebrationWeek] = useState<number | null>(null);
 
+  const loadPlan = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    const res = await mutate(`/api/plans/${planSlug}`);
+    if (!res.ok) {
+      setLoadError(res.error);
+      setLoading(false);
+      return;
+    }
+    const fetchedPlan = (res.data as { plan: Plan | null }).plan ?? null;
+    setPlan(fetchedPlan);
+    if (fetchedPlan?.createdAt && fetchedPlan.timelineWeeks) {
+      const currentWeek = Math.min(
+        Math.max(
+          Math.ceil(
+            (Date.now() - new Date(fetchedPlan.createdAt).getTime()) /
+              (7 * 24 * 60 * 60 * 1000)
+          ),
+          1
+        ),
+        fetchedPlan.timelineWeeks
+      );
+      setExpandedWeeks(new Set([currentWeek]));
+    }
+    setLoading(false);
+  }, [planSlug]);
+
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/plans/${planSlug}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          const fetchedPlan = data.plan;
-          setPlan(fetchedPlan);
-          if (fetchedPlan) {
-            const currentWeek = Math.min(
-              Math.max(
-                Math.ceil(
-                  (Date.now() - new Date(fetchedPlan.createdAt).getTime()) /
-                    (7 * 24 * 60 * 60 * 1000)
-                ),
-                1
-              ),
-              fetchedPlan.timelineWeeks
-            );
-            setExpandedWeeks(new Set([currentWeek]));
-          }
-        }
-      })
-      .catch(console.error)
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    loadPlan();
+  }, [loadPlan]);
+
+  const refetchPlan = useCallback(async () => {
+    const res = await mutate(`/api/plans/${planSlug}`);
+    if (res.ok) setPlan((res.data as { plan: Plan | null }).plan ?? null);
   }, [planSlug]);
 
   const updateProblemStatus = async (planProblemId: string, status: string, weekNumber: number) => {
@@ -179,23 +193,24 @@ export default function PlanRoadmapPage() {
 
       return updated;
     });
-    try {
-      const res = await fetch(`/api/plans/${planSlug}/problems`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planProblemId, status }),
+    const res = await mutate(`/api/plans/${planSlug}/problems`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planProblemId, status }),
+    });
+
+    if (!res.ok) {
+      // Roll the optimistic tick back and say so — a checkbox that silently
+      // un-ticks itself on the next reload is indistinguishable from a bug.
+      setCelebrationWeek(null);
+      await refetchPlan();
+      showToast({
+        type: "error",
+        message:
+          res.status === 429
+            ? res.error.message
+            : `${res.error.title} — we couldn't save that change.`,
       });
-      if (res.status === 429) {
-        const data = await res.json();
-        showToast({ type: "error", message: data.message || "Too many requests. Please slow down." });
-        fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
-        return;
-      }
-      if (!res.ok) {
-        fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
-      }
-    } catch {
-      fetch(`/api/plans/${planSlug}`).then((r) => r.json()).then((d) => setPlan(d.plan));
     }
   };
 
@@ -221,46 +236,57 @@ export default function PlanRoadmapPage() {
 
     setTimeout(() => setCelebrationWeek(weekNum), 300);
 
-    try {
-      const planId = plan!.id;
-      const res = await fetch(`/api/plans/${planId}/problems/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planProblemIds: Array.from(idsToUpdate),
-          status: "SOLVED",
-        }),
-      });
+    const res = await mutate(`/api/plans/${plan?.id}/problems/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        planProblemIds: Array.from(idsToUpdate),
+        status: "SOLVED",
+      }),
+    });
 
-      if (!res.ok) {
-        fetch(`/api/plans/${planSlug}`)
-          .then((r) => r.json())
-          .then((d) => setPlan(d.plan));
-        showToast({ type: "error", message: "Failed to mark all as solved." });
-      } else {
-        showToast({ type: "success", message: `${unsolved.length} problems marked solved!` });
-      }
-    } catch {
-      fetch(`/api/plans/${planSlug}`)
-        .then((r) => r.json())
-        .then((d) => setPlan(d.plan));
-      showToast({ type: "error", message: "Something went wrong." });
-    } finally {
-      setMarkingAll(null);
+    if (!res.ok) {
+      setCelebrationWeek(null);
+      await refetchPlan();
+      showToast({
+        type: "error",
+        message: `${res.error.title} — week ${weekNum} wasn't saved. Nothing was lost.`,
+      });
+    } else {
+      showToast({
+        type: "success",
+        message: `${unsolved.length} problems marked solved!`,
+      });
     }
+
+    setMarkingAll(null);
   };
 
   const saveNote = async (planProblemId: string, content: string) => {
     setNotesMap((prev) => ({ ...prev, [planProblemId]: content }));
-    try {
-      await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planProblemId, content }),
-      });
-    } catch (e) {
-      console.error("Failed to save note", e);
+    setNoteStatus((prev) => ({ ...prev, [planProblemId]: "saving" }));
+
+    const res = await mutate("/api/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planProblemId, content }),
+    });
+
+    if (!res.ok) {
+      // Keep the text in the box; the user's writing is the one thing here
+      // that isn't re-derivable.
+      setNoteStatus((prev) => ({ ...prev, [planProblemId]: "error" }));
+      return;
     }
+
+    setNoteStatus((prev) => ({ ...prev, [planProblemId]: "saved" }));
+    setTimeout(() => {
+      setNoteStatus((prev) =>
+        prev[planProblemId] === "saved"
+          ? { ...prev, [planProblemId]: "idle" }
+          : prev
+      );
+    }, 2500);
   };
 
   const toggleWeek = (week: number) => {
@@ -282,12 +308,58 @@ export default function PlanRoadmapPage() {
     );
   }
 
+  // A failed request is not a missing plan — say which one actually happened.
+  if (loadError) {
+    return (
+      <div className="max-w-lg mx-auto py-16">
+        <ErrorState
+          title={loadError.title}
+          message={loadError.message}
+          onRetry={loadPlan}
+        />
+      </div>
+    );
+  }
+
   if (!plan) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-xl font-semibold">Plan not found</h2>
-        <Link href="/dashboard" className="mt-4 inline-block">
+        <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          We couldn&apos;t find this plan
+        </h2>
+        <p className="text-sm mt-2 mb-4" style={{ color: "var(--text-secondary)" }}>
+          It may have been deleted, or the link is out of date.
+        </p>
+        <Link href="/dashboard" className="inline-block">
           <Button>Back to Plans</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // While a plan is generating the API returns { id, status } with no problems
+  // array. Without this guard the next line throws and takes the page down.
+  // Generation is owned by the plan page — sending the user there avoids two
+  // pages both POSTing /generate and building the roadmap twice.
+  if (plan.status === "GENERATING" || plan.status === "FAILED" || !plan.problems) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-6">
+        <div
+          className="w-12 h-12 rounded-full border-4 animate-spin mb-5"
+          style={{ borderColor: "var(--accent-dim)", borderTopColor: "var(--accent)" }}
+          role="status"
+          aria-label="Building your roadmap"
+        />
+        <h2 className="text-lg font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+          Your roadmap is still being built
+        </h2>
+        <p className="text-sm max-w-sm mb-5" style={{ color: "var(--text-secondary)" }}>
+          {plan.status === "FAILED"
+            ? "The last attempt didn't finish. You can retry it from the plan page."
+            : "This usually takes under a minute. The plan page shows live progress."}
+        </p>
+        <Link href={`/dashboard/plans/${planSlug}`}>
+          <Button>Go to plan</Button>
         </Link>
       </div>
     );
@@ -364,14 +436,14 @@ export default function PlanRoadmapPage() {
   };
 
   return (
-      <div className="flex flex-col lg:flex-row gap-0 min-h-screen -mx-6 -mt-6">
+      <div className="flex flex-col lg:flex-row gap-0 min-h-screen -mx-4 -mt-4 lg:-mx-8 lg:-mt-8">
       <aside
-        className="shrink-0 overflow-y-auto transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen flex lg:flex-col overflow-x-auto lg:overflow-x-hidden"
+        className={`shrink-0 overflow-y-auto transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen flex lg:flex-col overflow-x-auto lg:overflow-x-hidden w-full ${
+          sidebarOpen ? "lg:w-[280px] p-4" : "lg:w-[52px] px-2 py-3"
+        }`}
         style={{
           background: "var(--sidebar-bg)",
           borderRight: "1px solid var(--sidebar-border)",
-          width: sidebarOpen ? 280 : 52,
-          padding: sidebarOpen ? "16px 14px" : "12px 8px",
         }}
       >
         {/* Master toggle */}
@@ -640,6 +712,43 @@ export default function PlanRoadmapPage() {
           }
         })()}
 
+        {(() => {
+          // The catalogue may not hold enough of the requested difficulty to
+          // fill the hours offered. Say so, rather than letting a thin plan
+          // look like a bug.
+          const weeklyPlanned =
+            plan.problems.length > 0
+              ? plan.problems.reduce(
+                  (sum, p) => sum + problemEstimatedTime(p.problem),
+                  0
+                ) / plan.timelineWeeks
+              : 0;
+          const offered = plan.weeklyHours * 60;
+          if (weeklyPlanned >= offered * 0.85 || weeklyPlanned === 0) return null;
+          const hrs = (weeklyPlanned / 60).toFixed(1);
+          return (
+            <div
+              className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm mb-3"
+              style={{
+                background: "var(--accent-dim)",
+                border: "1px solid var(--accent-border)",
+              }}
+            >
+              <Target className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--accent-text)" }} />
+              <div>
+                <span className="font-semibold" style={{ color: "var(--accent-text)" }}>
+                  This plan fills about {hrs}h of your {plan.weeklyHours}h per week.
+                </span>
+                <span className="block mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  We keep your {plan.difficultyPreference.replace("_", " ").toLowerCase()} difficulty
+                  mix exactly as you set it, and there are only so many problems at that level.
+                  For a fuller week, shorten the timeline or soften the difficulty.
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="space-y-3">
           {Object.entries(problemsByWeek)
             .sort(([a], [b]) => Number(a) - Number(b))
@@ -828,6 +937,8 @@ export default function PlanRoadmapPage() {
                             {expandedNotes === pp.id && (
                               <div className="px-5 py-3" style={{ borderTop: "1px solid var(--border)" }}>
                                 <textarea
+                                  id={`note-${pp.id}`}
+                                  aria-label={`Notes for ${pp.problem.title}`}
                                   defaultValue={notesMap[pp.id] ?? pp.notes?.[0]?.content ?? ""}
                                   onBlur={(e) => saveNote(pp.id, e.target.value)}
                                   rows={3}
@@ -835,6 +946,39 @@ export default function PlanRoadmapPage() {
                                   className="w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none"
                                   style={{ background: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
                                 />
+                                <div
+                                  className="flex items-center justify-between gap-3 mt-1.5 min-h-[20px]"
+                                  role="status"
+                                  aria-live="polite"
+                                >
+                                  <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                                    {noteStatus[pp.id] === "saving" && "Saving…"}
+                                    {noteStatus[pp.id] === "saved" && "Saved"}
+                                    {noteStatus[pp.id] === "error" && (
+                                      <span style={{ color: "var(--danger)" }}>
+                                        Couldn&apos;t save — your text is still here.
+                                      </span>
+                                    )}
+                                  </span>
+                                  {noteStatus[pp.id] === "error" && (
+                                    <button
+                                      onClick={() => {
+                                        const el = document.getElementById(
+                                          `note-${pp.id}`
+                                        ) as HTMLTextAreaElement | null;
+                                        if (el) saveNote(pp.id, el.value);
+                                      }}
+                                      className="text-[11px] font-medium px-2 py-1 rounded-md cursor-pointer"
+                                      style={{
+                                        background: "var(--bg-input)",
+                                        border: "1px solid var(--border)",
+                                        color: "var(--text-primary)",
+                                      }}
+                                    >
+                                      Retry
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1006,11 +1150,19 @@ export default function PlanRoadmapPage() {
                 <p className="font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
                   You completed the entire plan!
                 </p>
-                <button
+                <Link
+                  href={`/dashboard/plans/${planSlug}/analytics`}
                   onClick={() => setCelebrationWeek(null)}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-semibold"
+                  className="block w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-semibold text-center"
                 >
                   View Analytics →
+                </Link>
+                <button
+                  onClick={() => setCelebrationWeek(null)}
+                  className="w-full py-2 text-sm transition-colors cursor-pointer"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Close
                 </button>
               </div>
             )}

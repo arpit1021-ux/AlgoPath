@@ -868,8 +868,7 @@ export default function HomePage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   {[
                     { label: "GitHub", href: "https://github.com/arpit1021-ux/AlgoPath" },
-                    { label: "LinkedIn", href: "https://linkedin.com" },
-                    { label: "Contact", href: "mailto:hello@algopath.dev" },
+                                        { label: "Contact", href: "mailto:hello@algopath.dev" },
                   ].map((link) => (
                     <a
                       key={link.label}

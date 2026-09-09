@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { z } from "zod";
 import { revisionLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
+    const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
+    const user = await getUserByClerkId(clerkId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

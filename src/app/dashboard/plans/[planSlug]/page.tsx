@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { redirect } from "next/navigation";
 import {
   CheckCircle2,
@@ -19,6 +19,10 @@ import { ProgressBar, DifficultyBadge } from "@/components/ui-custom";
 import { GeneratingPlan } from "@/components/generating-plan";
 import { cn } from "@/lib/utils";
 
+export const metadata = {
+  title: "Plan",
+};
+
 export default async function PlanDashboardPage({
   params,
 }: {
@@ -29,7 +33,7 @@ export default async function PlanDashboardPage({
 
   if (!clerkId) redirect("/login");
 
-  const user = await db.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) redirect("/login");
 
   let plan = await db.plan.findFirst({

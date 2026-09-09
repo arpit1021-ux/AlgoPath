@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -44,6 +44,23 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  // Move focus into the dialog on open, restore it to the trigger on close,
+  // and let Escape cancel from anywhere.
+  useEffect(() => {
+    if (!showDelete) return;
+    cancelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowDelete(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      triggerRef.current?.focus();
+    };
+  }, [showDelete]);
 
   const pct = total > 0 ? Math.round((solved / total) * 100) : 0;
 
@@ -83,16 +100,18 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
     >
       {/* Delete button */}
       <button
+        ref={triggerRef}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           setShowDelete(true);
         }}
-        className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg backdrop-blur-sm"
+        className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-1.5 rounded-lg backdrop-blur-sm"
         style={{ background: "rgba(0,0,0,0.5)", color: "var(--danger)" }}
-        title="Delete plan"
+        title={`Delete ${name}`}
+        aria-label={`Delete ${name}`}
       >
-        <Trash2 className="w-3.5 h-3.5" />
+        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
 
       <Link href={`/dashboard/plans/${slug}`} className="contents">
@@ -182,7 +201,12 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
 
       {/* Delete confirmation modal */}
       {showDelete && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`delete-title-${id}`}
+        >
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => { setShowDelete(false); setDeleting(false); }}
@@ -195,6 +219,7 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
             }}
           >
             <h3
+              id={`delete-title-${id}`}
               className="text-base font-semibold mb-2"
               style={{
                 color: "var(--text-primary)",
@@ -208,6 +233,7 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
             </p>
             <div className="flex gap-3 justify-end">
               <button
+                ref={cancelRef}
                 onClick={() => { setShowDelete(false); setDeleting(false); }}
                 className="btn-secondary text-sm py-2 px-4"
                 disabled={deleting}

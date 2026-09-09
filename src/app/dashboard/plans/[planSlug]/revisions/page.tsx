@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,6 +14,9 @@ import {
   ExternalLink, Calendar, ArrowLeft, Clock,
 } from "lucide-react";
 import { RevisionsSkeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-message";
+import { useApiData, mutate } from "@/lib/use-api-data";
+import { showToast } from "@/components/ui/toast";
 
 interface Revision {
   id: string;
@@ -30,6 +33,11 @@ interface Revision {
     };
     plan: { name: string };
   };
+}
+
+interface RevisionsResponse {
+  today: Revision[];
+  overdue: Revision[];
 }
 
 const DIFF_COLORS: Record<string, string> = {
@@ -133,57 +141,61 @@ function RevisionCard({
 export default function RevisionsPage() {
   const params = useParams();
   const planSlug = params.planSlug as string;
-  const [todayRevisions, setTodayRevisions] = useState<Revision[]>([]);
-  const [overdueRevisions, setOverdueRevisions] = useState<Revision[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, retry, setData } = useApiData<RevisionsResponse>(
+    `/api/revisions?planSlug=${planSlug}`,
+    [planSlug]
+  );
   const [completing, setCompleting] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/revisions?planSlug=${planSlug}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setTodayRevisions(data.today ?? []);
-          setOverdueRevisions(data.overdue ?? []);
-        }
-      })
-      .catch(console.error)
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [planSlug]);
+  const todayRevisions = data?.today ?? [];
+  const overdueRevisions = data?.overdue ?? [];
 
   const completeRevision = async (revisionId: string) => {
-    // Optimistic remove
     setCompleting((prev) => new Set(prev).add(revisionId));
-    setTodayRevisions((prev) => prev.filter((r) => r.id !== revisionId));
-    setOverdueRevisions((prev) => prev.filter((r) => r.id !== revisionId));
 
-    try {
-      await fetch("/api/revisions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ revisionId }),
+    // Optimistic remove — restored if the server does not accept the write.
+    const snapshot = data;
+    setData((prev) =>
+      prev
+        ? {
+            today: (prev.today ?? []).filter((r) => r.id !== revisionId),
+            overdue: (prev.overdue ?? []).filter((r) => r.id !== revisionId),
+          }
+        : prev
+    );
+
+    const res = await mutate("/api/revisions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revisionId }),
+    });
+
+    if (!res.ok) {
+      setData(() => snapshot);
+      showToast({
+        type: "error",
+        message: `${res.error.title} — that revision is back in your list.`,
       });
-    } catch (e) {
-      console.error(e);
-      // Rollback on error
-      fetch(`/api/revisions?planSlug=${planSlug}`)
-        .then((r) => r.json())
-        .then((data) => {
-          setTodayRevisions(data.today ?? []);
-          setOverdueRevisions(data.overdue ?? []);
-        });
-    } finally {
-      setCompleting((prev) => {
-        const next = new Set(prev);
-        next.delete(revisionId);
-        return next;
-      });
+    } else {
+      showToast({ type: "success", message: "Reviewed — next one is scheduled." });
     }
+
+    setCompleting((prev) => {
+      const next = new Set(prev);
+      next.delete(revisionId);
+      return next;
+    });
   };
 
   if (loading) return <RevisionsSkeleton />;
+
+  if (error) {
+    return (
+      <div className="max-w-lg mx-auto py-16">
+        <ErrorState title={error.title} message={error.message} onRetry={retry} />
+      </div>
+    );
+  }
 
   const totalDue = todayRevisions.length + overdueRevisions.length;
 

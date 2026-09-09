@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useApiData, mutate } from "@/lib/use-api-data";
+import { ErrorState } from "@/components/ui/error-message";
+import { RevisionsSkeleton } from "@/components/ui/skeleton";
+import { showToast } from "@/components/ui/toast";
 import {
   RotateCcw, CheckCircle2, AlertTriangle,
   ExternalLink, Calendar, Clock,
@@ -27,6 +31,11 @@ interface Revision {
     };
     plan: { name: string; id: string };
   };
+}
+
+interface RevisionsResponse {
+  today: Revision[];
+  overdue: Revision[];
 }
 
 const DIFF_COLORS: Record<string, string> = {
@@ -129,60 +138,56 @@ function RevisionCard({
 }
 
 export default function AllRevisionsPage() {
-  const [todayRevisions, setTodayRevisions] = useState<Revision[]>([]);
-  const [overdueRevisions, setOverdueRevisions] = useState<Revision[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, retry, setData } =
+    useApiData<RevisionsResponse>("/api/revisions");
   const [completing, setCompleting] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/revisions")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setTodayRevisions(data.today ?? []);
-          setOverdueRevisions(data.overdue ?? []);
-        }
-      })
-      .catch(console.error)
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
+  const todayRevisions = data?.today ?? [];
+  const overdueRevisions = data?.overdue ?? [];
 
   const completeRevision = async (revisionId: string) => {
     setCompleting((prev) => new Set(prev).add(revisionId));
-    setTodayRevisions((prev) => prev.filter((r) => r.id !== revisionId));
-    setOverdueRevisions((prev) => prev.filter((r) => r.id !== revisionId));
 
-    try {
-      await fetch("/api/revisions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ revisionId }),
+    // Optimistic remove — kept only if the server actually accepts the write.
+    const snapshot = data;
+    setData((prev) =>
+      prev
+        ? {
+            today: (prev.today ?? []).filter((r) => r.id !== revisionId),
+            overdue: (prev.overdue ?? []).filter((r) => r.id !== revisionId),
+          }
+        : prev
+    );
+
+    const res = await mutate("/api/revisions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revisionId }),
+    });
+
+    if (!res.ok) {
+      setData(() => snapshot);
+      showToast({
+        type: "error",
+        message: `${res.error.title} — that revision is back in your list.`,
       });
-    } catch {
-      fetch("/api/revisions")
-        .then((r) => r.json())
-        .then((data) => {
-          setTodayRevisions(data.today ?? []);
-          setOverdueRevisions(data.overdue ?? []);
-        });
-    } finally {
-      setCompleting((prev) => {
-        const next = new Set(prev);
-        next.delete(revisionId);
-        return next;
-      });
+    } else {
+      showToast({ type: "success", message: "Reviewed — next one is scheduled." });
     }
+
+    setCompleting((prev) => {
+      const next = new Set(prev);
+      next.delete(revisionId);
+      return next;
+    });
   };
 
-  if (loading) {
+  if (loading) return <RevisionsSkeleton />;
+
+  if (error) {
     return (
-      <div className="space-y-4 p-6 animate-pulse">
-        <div className="h-8 w-48 rounded-lg bg-white/5" />
-        <div className="h-32 rounded-xl bg-white/5" />
-        <div className="h-32 rounded-xl bg-white/5" />
-        <div className="h-32 rounded-xl bg-white/5" />
+      <div className="max-w-lg mx-auto py-16">
+        <ErrorState title={error.title} message={error.message} onRetry={retry} />
       </div>
     );
   }

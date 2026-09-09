@@ -26,8 +26,14 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://algopath.dev";
+
 export const metadata: Metadata = {
-  title: "AlgoPath — Smart LeetCode Prep",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "AlgoPath — Smart LeetCode Prep",
+    template: "%s · AlgoPath",
+  },
   description:
     "Stop grinding randomly. Build a personalized week-by-week LeetCode roadmap based on your target companies. Free forever.",
   keywords: ["leetcode", "interview prep", "coding interview", "FAANG prep", "DSA", "data structures"],

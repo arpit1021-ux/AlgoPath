@@ -4,17 +4,20 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 
-async function resolvePlan(slugOrId: string, userId: string) {
-  const bySlug = await db.plan.findFirst({
-    where: { slug: slugOrId, userId, deletedAt: null },
+/**
+ * Resolve a plan by slug or id, scoped to the signed-in user, in one query.
+ * Previously two sequential lookups behind a separate user lookup — three
+ * round trips to do what the database can answer in one.
+ */
+async function resolvePlan(slugOrId: string, clerkId: string) {
+  return db.plan.findFirst({
+    where: {
+      OR: [{ slug: slugOrId }, { id: slugOrId }],
+      deletedAt: null,
+      user: { clerkId },
+    },
     select: { id: true },
   });
-  if (bySlug) return bySlug;
-  const byId = await db.plan.findFirst({
-    where: { id: slugOrId, userId, deletedAt: null },
-    select: { id: true },
-  });
-  return byId;
 }
 
 export async function GET(
@@ -27,32 +30,33 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
     const { planId } = await params;
-    const resolved = await resolvePlan(planId, user.id);
+
+    // One round trip instead of four: resolve the plan by slug OR id, scoped to
+    // the signed-in user, and read the status at the same time.
+    const resolved = await db.plan.findFirst({
+      where: {
+        OR: [{ slug: planId }, { id: planId }],
+        deletedAt: null,
+        user: { clerkId },
+      },
+      select: { id: true, status: true },
+    });
+
     if (!resolved) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
-    // Quick status check — short-circuit if still generating
-    const quickStatus = await db.plan.findFirst({
-      where: { id: resolved.id },
-      select: { status: true },
-    });
-
-    if (quickStatus?.status === "GENERATING" || quickStatus?.status === "FAILED") {
+    // Short-circuit while the roadmap is still being built — no problems yet.
+    if (resolved.status === "GENERATING" || resolved.status === "FAILED") {
       return NextResponse.json(
-        { plan: { id: resolved.id, status: quickStatus.status } },
+        { plan: { id: resolved.id, status: resolved.status } },
         { headers: { "Cache-Control": "private, max-age=1" } }
       );
     }
 
     const plan = await db.plan.findFirst({
-      where: { id: resolved.id, userId: user.id, deletedAt: null },
+      where: { id: resolved.id, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -132,13 +136,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
     const { planId } = await params;
-    const resolved = await resolvePlan(planId, user.id);
+    const resolved = await resolvePlan(planId, clerkId);
     if (!resolved) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
@@ -178,13 +177,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.user.findUnique({ where: { clerkId } });
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
     const { planId } = await params;
-    const resolved = await resolvePlan(planId, user.id);
+    const resolved = await resolvePlan(planId, clerkId);
     if (!resolved) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }

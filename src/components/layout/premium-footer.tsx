@@ -85,7 +85,7 @@ export function Footer() {
                 <Github className="w-5 h-5" />
               </a>
               <a
-                href="https://linkedin.com"
+                href="https://github.com/arpit1021-ux"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: "var(--text-muted)" }}
@@ -114,8 +114,8 @@ export function Footer() {
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {[
                 { label: "Dashboard", href: "/dashboard" },
-                { label: "Plans", href: "/dashboard/plans" },
-                { label: "Analytics", href: "/dashboard/plans" },
+                { label: "New Plan", href: "/dashboard/plans/new" },
+                { label: "Revisions", href: "/dashboard/revisions" },
               ].map((item) => (
                 <Link
                   key={item.href}

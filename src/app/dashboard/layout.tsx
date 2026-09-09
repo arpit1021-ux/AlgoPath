@@ -263,7 +263,11 @@ export default function DashboardLayout({
         </div>
       </div>
 
-      <main className="flex-1 min-h-screen" style={{ marginLeft: collapsed ? "64px" : "260px", transition: "margin-left 0.3s ease" }}>
+      <main
+        className={`flex-1 min-w-0 min-h-screen transition-[margin] duration-300 ${
+          collapsed ? "lg:ml-16" : "lg:ml-[260px]"
+        }`}
+      >
         <div
           className="sticky top-0 z-50 px-6 lg:px-10 h-14 flex items-center justify-between"
           style={{

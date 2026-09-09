@@ -1,14 +1,19 @@
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, getUserByClerkId } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { Trophy, Lock, CheckCircle2, Target, Sword, Crown, TrendingUp, RotateCcw, Zap, Star, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export const metadata = {
+  title: "Badges",
+  description: "Milestones you\u2019ve unlocked across all your plans.",
+};
 
 export default async function BadgesPage() {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/login");
 
-  const user = await db.user.findUnique({ where: { clerkId } });
+  const user = await getUserByClerkId(clerkId);
   if (!user) redirect("/login");
 
   const [totalSolved, totalRevisions, recentActivity, allPlans] = await Promise.all([

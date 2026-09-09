@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { COMPANIES, TOPICS, DIFFICULTY_LABELS } from "@/lib/types";
+import { COMPANIES, TOPICS, RECOMMENDED_TOPICS, DIFFICULTY_LABELS } from "@/lib/types";
 import type {
   ExperienceLevel,
   DifficultyPreference,
@@ -48,33 +48,23 @@ function LoadingExperience({ difficulty }: { difficulty: string }) {
 
   const steps = [
     {
-      label: "Analyzing your preferences",
-      detail: "Reading your experience level, timeline, and company targets",
+      label: "Checking your settings",
+      detail: "Experience level, timeline, hours and target companies",
+      duration: 1200,
+    },
+    {
+      label: "Creating your plan",
+      detail: "Saving your preferences so the roadmap can be built from them",
       duration: 2000,
     },
     {
-      label: "Scanning problem database",
-      detail: "Filtering 914 problems by your selected companies and topics",
-      duration: 3000,
-    },
-    {
-      label: "Calculating difficulty balance",
+      label: "Handing off to the roadmap builder",
       detail:
         difficulty === "VERY_HARD" || difficulty === "HARD"
-          ? "You selected Hard — prioritizing advanced problems for maximum challenge"
+          ? "You chose a hard mix — we'll weight the schedule towards it"
           : difficulty === "VERY_EASY" || difficulty === "EASY"
-            ? "Building a confidence-first progression with approachable problems"
-            : "Balancing Easy, Medium, and Hard problems across your timeline",
-      duration: 4000,
-    },
-    {
-      label: "Scheduling your weeks",
-      detail: "Distributing problems across your timeline with topic variety",
-      duration: 3000,
-    },
-    {
-      label: "Finalizing your roadmap",
-      detail: "Almost done — saving your personalized plan",
+            ? "We'll start you on approachable problems and build up"
+            : "We'll balance difficulty across your timeline",
       duration: 2000,
     },
   ];
@@ -101,7 +91,9 @@ function LoadingExperience({ difficulty }: { difficulty: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const progress = Math.min((currentStep / (steps.length - 1)) * 100, 95);
+  // No percentage: nothing here measures real progress, and a bar that stalls
+  // at 95% reads as broken. The checked-off step list carries the information
+  // honestly; an indeterminate bar carries the motion.
 
   return (
     <div className="max-w-lg w-full mx-4">
@@ -110,21 +102,23 @@ function LoadingExperience({ difficulty }: { difficulty: string }) {
           className="text-xl font-bold mb-1"
           style={{ color: "var(--text-primary)" }}
         >
-          Building your roadmap
+          Saving your plan
         </h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-          Personalizing 914 problems for your exact goals
+          Then we&apos;ll build your roadmap on the next screen
         </p>
       </div>
 
       <div
-        className="rounded-full overflow-hidden mb-6"
+        className="rounded-full overflow-hidden mb-6 relative"
         style={{ height: "4px", background: "var(--border)" }}
+        role="progressbar"
+        aria-label="Building your roadmap"
       >
         <div
-          className="h-full rounded-full transition-all duration-700 ease-out"
+          className="absolute inset-y-0 rounded-full indeterminate-bar"
           style={{
-            width: `${progress}%`,
+            width: "35%",
             background: "linear-gradient(90deg, #86868b, #a1a1a6)",
           }}
         />
@@ -242,6 +236,20 @@ export default function NewPlanPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  // Under ~1s an overlay just flickers and makes the action feel slower, so
+  // hold it back briefly and let fast responses show nothing at all.
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  // Tied to `submitting` so every exit path — success, each error branch, the
+  // network catch — takes the overlay down without needing its own cleanup.
+  useEffect(() => {
+    if (!submitting) {
+      setShowOverlay(false);
+      return;
+    }
+    const t = setTimeout(() => setShowOverlay(true), 400);
+    return () => clearTimeout(t);
+  }, [submitting]);
   const [error, setError] = useState<string | null>(null);
   const [planCreated, setPlanCreated] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<string | null>(null);
@@ -366,7 +374,11 @@ export default function NewPlanPage() {
           targetCompanies: selectedCompanies,
           topicMode,
           selectedTopics:
-            topicMode === "ALL" ? [...TOPICS] : selectedTopics,
+            topicMode === "ALL"
+              ? [...TOPICS]
+              : topicMode === "RECOMMENDED"
+                ? [...RECOMMENDED_TOPICS]
+                : selectedTopics,
           difficultyPreference,
         }),
       });
@@ -397,11 +409,8 @@ export default function NewPlanPage() {
       }
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         setError(
-          data.detail ||
-            data.error ||
-            "We couldn't create your plan right now. This might be a temporary issue — please try again in a moment."
+          "We couldn't create your plan right now. This is usually a temporary problem on our side — please try again in a moment."
         );
         setSubmitting(false);
         return;
@@ -411,10 +420,8 @@ export default function NewPlanPage() {
       setSubmitting(false);
       setPlanCreated(true);
       setCreatedPlanId(data.plan.id);
-      setTimeout(
-        () => router.push(`/dashboard/plans/${data.plan.id}`),
-        1000
-      );
+      // Short enough to register, short enough not to feel like a second wait.
+      setTimeout(() => router.push(`/dashboard/plans/${data.plan.id}`), 450);
     } catch {
       setError(
         "Connection failed. Please check your internet connection and try again."
@@ -988,11 +995,11 @@ export default function NewPlanPage() {
                       style={{ color: "var(--text-secondary)" }}
                     >
                       <Sparkles className="h-4 w-4 inline mr-1" />
-                      Based on your selected companies, we recommend:{" "}
+                      A core set covering the patterns interviewers ask most —{" "}
                       <strong style={{ color: "var(--text-primary)" }}>
-                        Arrays, Trees, Graphs, Dynamic Programming, Hashing,
-                        Binary Search
+                        {RECOMMENDED_TOPICS.length} topics
                       </strong>
+                      : {RECOMMENDED_TOPICS.join(", ")}
                     </p>
                   </div>
                 )}
@@ -1183,7 +1190,7 @@ export default function NewPlanPage() {
       </div>
 
       {/* STATE 1: Loading overlay */}
-      {submitting && (
+      {showOverlay && (
         <div
           className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm"
           style={{ background: "rgba(0,0,0,0.85)" }}
@@ -1231,10 +1238,10 @@ export default function NewPlanPage() {
               className="text-2xl font-bold mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              Plan created!
+              Plan saved
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-              Taking you to your roadmap — it will be ready in seconds.
+              Now building your roadmap — this continues on the next screen.
             </p>
 
             <div
