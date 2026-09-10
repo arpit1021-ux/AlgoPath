@@ -27,7 +27,7 @@ const CreatePlanSchema = z.object({
   difficultyPreference: z.enum(["VERY_EASY", "EASY", "MEDIUM", "HARD", "VERY_HARD"]),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       db.problem.count(),
     ]);
 
-    const { name, description, experienceLevel, timelineWeeks, weeklyHours, targetCompanies, topicMode, selectedTopics, difficultyPreference } = parsed.data;
+    const { name, description, experienceLevel, timelineWeeks, weeklyHours, targetCompanies, selectedTopics, difficultyPreference } = parsed.data;
 
     let slug = generatePlanSlug(name);
 

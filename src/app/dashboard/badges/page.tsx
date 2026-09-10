@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db, getUserByClerkId } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { Trophy, Lock, CheckCircle2, Target, Sword, Crown, TrendingUp, RotateCcw, Zap, Star, GraduationCap } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Trophy, CheckCircle2, Target, Sword, Crown, TrendingUp, RotateCcw, Zap, Star, GraduationCap } from "lucide-react";
 
 export const metadata = {
   title: "Badges",
@@ -48,7 +47,7 @@ export default async function BadgesPage() {
       return d.getTime();
     })
   );
-  let checkDate = new Date(today);
+  const checkDate = new Date(today);
   while (true) {
     if (activityDates.has(checkDate.getTime())) {
       streak++;
@@ -57,8 +56,6 @@ export default async function BadgesPage() {
       break;
     }
   }
-
-  const totalProblemsInPlans = allPlans.reduce((sum: number, p) => sum + p.problems.length, 0);
 
   const badges = [
     {

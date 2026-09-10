@@ -5,7 +5,7 @@ export async function POST() {
   try {
     await seedProblems();
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Seed failed" }, { status: 500 });
   }
 }

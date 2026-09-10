@@ -26,7 +26,11 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://algopath.dev";
+// Docker's `ENV FOO=${ARG}` sets an empty string when no --build-arg is
+// passed, and "" is not nullish — so `??` would hand new URL("") a value it
+// rejects and the build dies collecting page data. Trim-and-|| covers both.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://algopath.dev";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -53,7 +57,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider afterSignOutUrl="/">
+    <ClerkProvider
+      afterSignOutUrl="/"
+      // Where Clerk lands a user when no forceRedirectUrl applies — without
+      // these it can bounce back to the page they signed in from.
+      signInFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+      signInUrl="/login"
+      signUpUrl="/register"
+    >
       <html lang="en" suppressHydrationWarning>
         <head>
           <script

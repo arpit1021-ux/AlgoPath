@@ -38,7 +38,7 @@ COPY . .
 # be present now rather than at runtime. It is a public value by design.
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_SITE_URL="https://algopath.dev"
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
 
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"

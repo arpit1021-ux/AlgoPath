@@ -109,6 +109,62 @@ function CollapsibleSidebarSection({
   );
 }
 
+/* --- Impure values, read once and outside render ---------------------------
+   Date.now() and Math.random() return something different on every call, so
+   reading them while rendering makes the same component produce two different
+   trees. Both are captured once per mount instead: the clock as a snapshot,
+   the confetti as a fixed set of pieces -- which also fixes the bug where any
+   re-render mid-celebration re-rolled every piece and made the animation jump.
+--------------------------------------------------------------------------- */
+
+function nowMs() {
+  return Date.now();
+}
+
+const CONFETTI_COLORS = [
+  "#86868b", "#a1a1a6", "#d2d2d7", "#10b981",
+  "#f59e0b", "#ef4444", "#ec4899", "#f97316",
+];
+const SHOWER_SHAPES = ["50%", "2px", "0"];
+const BURST_SIZES = ["50%", "30%", "10%"];
+
+interface ShowerPiece {
+  x: string;
+  w: string;
+  h: string;
+  duration: string;
+  delay: string;
+}
+interface BurstPiece {
+  tx: number;
+  ty: number;
+  size: string;
+  duration: string;
+  delay: string;
+}
+
+function makeConfetti(): { shower: ShowerPiece[]; burst: BurstPiece[] } {
+  const shower = Array.from({ length: 40 }, () => ({
+    x: `${Math.random() * 100}%`,
+    w: `${6 + Math.random() * 10}px`,
+    h: `${6 + Math.random() * 10}px`,
+    duration: `${2 + Math.random() * 2}s`,
+    delay: `${Math.random() * 0.8}s`,
+  }));
+  const burst = Array.from({ length: 30 }, (_, i) => {
+    const angle = (i / 30) * 360;
+    const distance = 80 + Math.random() * 180;
+    return {
+      tx: Math.cos((angle * Math.PI) / 180) * distance,
+      ty: Math.sin((angle * Math.PI) / 180) * distance,
+      size: `${4 + Math.random() * 8}px`,
+      duration: `${1.5 + Math.random() * 1}s`,
+      delay: `${Math.random() * 0.3}s`,
+    };
+  });
+  return { shower, burst };
+}
+
 export default function PlanRoadmapPage() {
   const params = useParams();
   const planSlug = params.planSlug as string;
@@ -134,37 +190,57 @@ export default function PlanRoadmapPage() {
     Record<string, "idle" | "saving" | "saved" | "error">
   >({});
   const [celebrationWeek, setCelebrationWeek] = useState<number | null>(null);
+  // Lazy initialisers: React calls these once, outside the render it is
+  // committing, so the impure reads never happen twice for the same tree.
+  const [now] = useState(nowMs);
+  const [confetti] = useState(makeConfetti);
 
-  const loadPlan = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    const res = await mutate(`/api/plans/${planSlug}`);
-    if (!res.ok) {
-      setLoadError(res.error);
-      setLoading(false);
-      return;
-    }
-    const fetchedPlan = (res.data as { plan: Plan | null }).plan ?? null;
-    setPlan(fetchedPlan);
-    if (fetchedPlan?.createdAt && fetchedPlan.timelineWeeks) {
-      const currentWeek = Math.min(
-        Math.max(
-          Math.ceil(
-            (Date.now() - new Date(fetchedPlan.createdAt).getTime()) /
-              (7 * 24 * 60 * 60 * 1000)
-          ),
-          1
-        ),
-        fetchedPlan.timelineWeeks
-      );
-      setExpandedWeeks(new Set([currentWeek]));
-    }
-    setLoading(false);
-  }, [planSlug]);
+  // Bumped by retry; changing it re-runs the load effect below. The fetch
+  // lives in the effect rather than in a callback the effect invokes, so no
+  // state is set synchronously while React is committing.
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
-    loadPlan();
-  }, [loadPlan]);
+    let cancelled = false;
+
+    void (async () => {
+      const res = await mutate(`/api/plans/${planSlug}`);
+      if (cancelled) return;
+      if (!res.ok) {
+        setLoadError(res.error);
+        setLoading(false);
+        return;
+      }
+      const fetchedPlan = (res.data as { plan: Plan | null }).plan ?? null;
+      setPlan(fetchedPlan);
+      if (fetchedPlan?.createdAt && fetchedPlan.timelineWeeks) {
+        const currentWeek = Math.min(
+          Math.max(
+            Math.ceil(
+              (nowMs() - new Date(fetchedPlan.createdAt).getTime()) /
+                (7 * 24 * 60 * 60 * 1000)
+            ),
+            1
+          ),
+          fetchedPlan.timelineWeeks
+        );
+        setExpandedWeeks(new Set([currentWeek]));
+      }
+      setLoadError(null);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planSlug, loadAttempt]);
+
+  // Retry runs from a click, where setting state up front is exactly right.
+  const retryLoad = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
+    setLoadAttempt((n) => n + 1);
+  }, []);
 
   const refetchPlan = useCallback(async () => {
     const res = await mutate(`/api/plans/${planSlug}`);
@@ -315,7 +391,7 @@ export default function PlanRoadmapPage() {
         <ErrorState
           title={loadError.title}
           message={loadError.message}
-          onRetry={loadPlan}
+          onRetry={retryLoad}
         />
       </div>
     );
@@ -373,8 +449,7 @@ export default function PlanRoadmapPage() {
   const currentWeek = Math.min(
     Math.max(
       Math.ceil(
-        (Date.now() - new Date(plan.createdAt).getTime()) /
-          (7 * 24 * 60 * 60 * 1000)
+        (now - new Date(plan.createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000)
       ),
       1
     ),
@@ -655,7 +730,7 @@ export default function PlanRoadmapPage() {
         {(() => {
           if (!plan.createdAt) return null;
           
-          const planAgeMs = Date.now() - new Date(plan.createdAt).getTime();
+          const planAgeMs = now - new Date(plan.createdAt).getTime();
           const planAgeDays = planAgeMs / (1000 * 60 * 60 * 24);
           const planAgeWeeks = planAgeDays / 7;
           
@@ -677,7 +752,7 @@ export default function PlanRoadmapPage() {
                     {diff} problems ahead of schedule!
                   </span>
                   <span className="text-[var(--success)]/60 ml-2">
-                    At this pace you'll finish {Math.round(diff / (totalP / plan.timelineWeeks / 7))} days early.
+                    At this pace you&apos;ll finish {Math.round(diff / (totalP / plan.timelineWeeks / 7))} days early.
                   </span>
                 </div>
               </div>
@@ -1008,54 +1083,42 @@ export default function PlanRoadmapPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
           {/* Shower confetti — full screen falling pieces */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(40)].map((_, i) => {
-              const colors = ["#86868b","#a1a1a6","#d2d2d7","#10b981","#f59e0b","#ef4444","#ec4899","#f97316"];
-              const shapes = ["50%", "2px", "0"];
-              return (
-                <div
-                  key={`shower-${i}`}
-                  className="confetti-shower-piece"
-                  style={{
-                    "--x": `${Math.random() * 100}%`,
-                    "--color": colors[i % colors.length],
-                    "--w": `${6 + Math.random() * 10}px`,
-                    "--h": `${6 + Math.random() * 10}px`,
-                    "--radius": shapes[i % shapes.length],
-                    "--duration": `${2 + Math.random() * 2}s`,
-                    "--delay": `${Math.random() * 0.8}s`,
-                  } as React.CSSProperties}
-                />
-              );
-            })}
+            {confetti.shower.map((piece, i) => (
+              <div
+                key={`shower-${i}`}
+                className="confetti-shower-piece"
+                style={{
+                  "--x": piece.x,
+                  "--color": CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+                  "--w": piece.w,
+                  "--h": piece.h,
+                  "--radius": SHOWER_SHAPES[i % SHOWER_SHAPES.length],
+                  "--duration": piece.duration,
+                  "--delay": piece.delay,
+                } as React.CSSProperties}
+              />
+            ))}
           </div>
 
           {/* Burst confetti — centered explosion */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(30)].map((_, i) => {
-              const angle = (i / 30) * 360;
-              const distance = 80 + Math.random() * 180;
-              const tx = Math.cos((angle * Math.PI) / 180) * distance;
-              const ty = Math.sin((angle * Math.PI) / 180) * distance;
-              const colors = ["#86868b","#a1a1a6","#d2d2d7","#10b981","#f59e0b","#ef4444","#ec4899","#f97316"];
-              const sizes = ["50%", "30%", "10%"];
-              return (
-                <div
-                  key={`burst-${i}`}
-                  className="confetti-particle"
-                  style={{
-                    left: "50%",
-                    top: "40%",
-                    "--tx": `${tx}px`,
-                    "--ty": `${ty}px`,
-                    "--color": colors[i % colors.length],
-                    "--size": `${4 + Math.random() * 8}px`,
-                    "--radius": sizes[i % sizes.length],
-                    "--duration": `${1.5 + Math.random() * 1}s`,
-                    "--delay": `${Math.random() * 0.3}s`,
-                  } as React.CSSProperties}
-                />
-              );
-            })}
+            {confetti.burst.map((piece, i) => (
+              <div
+                key={`burst-${i}`}
+                className="confetti-particle"
+                style={{
+                  left: "50%",
+                  top: "40%",
+                  "--tx": `${piece.tx}px`,
+                  "--ty": `${piece.ty}px`,
+                  "--color": CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+                  "--size": piece.size,
+                  "--radius": BURST_SIZES[i % BURST_SIZES.length],
+                  "--duration": piece.duration,
+                  "--delay": piece.delay,
+                } as React.CSSProperties}
+              />
+            ))}
           </div>
 
           {/* Expanding rings behind modal */}
@@ -1077,7 +1140,7 @@ export default function PlanRoadmapPage() {
             </p>
             
             {(() => {
-              const planAgeMs = Date.now() - new Date(plan.createdAt).getTime();
+              const planAgeMs = now - new Date(plan.createdAt).getTime();
               const planAgeDays = planAgeMs / (1000 * 60 * 60 * 24);
               const expectedDays = celebrationWeek * 7;
               const savedDays = Math.floor(expectedDays - planAgeDays);
@@ -1090,7 +1153,7 @@ export default function PlanRoadmapPage() {
                       {savedDays} days ahead of schedule!
                     </p>
                     <p className="text-[var(--success)]/60 text-xs mt-1">
-                      At this pace, you'll finish your entire plan early.
+                      At this pace, you&apos;ll finish your entire plan early.
                     </p>
                   </div>
                 );

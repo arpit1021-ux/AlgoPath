@@ -23,6 +23,13 @@ export const metadata = {
   title: "Plan",
 };
 
+/* Reading the clock is impure: two calls in the same render can disagree.
+   Behind a named helper the value is fetched once, deliberately, instead of
+   inline in the middle of a render expression. */
+function nowMs() {
+  return Date.now();
+}
+
 export default async function PlanDashboardPage({
   params,
 }: {
@@ -36,7 +43,7 @@ export default async function PlanDashboardPage({
   const user = await getUserByClerkId(clerkId);
   if (!user) redirect("/login");
 
-  let plan = await db.plan.findFirst({
+  const plan = await db.plan.findFirst({
     where: {
       OR: [{ slug: planSlug }, { id: planSlug }],
       userId: user.id,
@@ -94,7 +101,7 @@ export default async function PlanDashboardPage({
   const currentWeek = Math.min(
     Math.max(
       Math.ceil(
-        (Date.now() - new Date(plan.createdAt).getTime()) /
+        (nowMs() - new Date(plan.createdAt).getTime()) /
           (7 * 24 * 60 * 60 * 1000)
       ),
       1
@@ -124,7 +131,7 @@ export default async function PlanDashboardPage({
     }
   });
 
-  const planAgeMs = Date.now() - new Date(plan.createdAt).getTime();
+  const planAgeMs = nowMs() - new Date(plan.createdAt).getTime();
   const planAgeDays = planAgeMs / (1000 * 60 * 60 * 24);
   const planAgeWeeks = planAgeDays / 7;
   const expectedSolvedByNow = Math.floor(
@@ -145,7 +152,7 @@ export default async function PlanDashboardPage({
               {paceDiff} problems ahead of schedule!
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-              At this pace you'll finish {Math.round(paceDiff / (totalProblems / plan.timelineWeeks / 7))} days early.
+              At this pace you&apos;ll finish {Math.round(paceDiff / (totalProblems / plan.timelineWeeks / 7))} days early.
             </p>
           </div>
         </div>

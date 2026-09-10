@@ -52,13 +52,16 @@ export function PlanCard({ id, slug, name, status, solved, total, companies }: P
   useEffect(() => {
     if (!showDelete) return;
     cancelRef.current?.focus();
+    // Captured now: by the time cleanup runs the ref may point somewhere else,
+    // and focus has to return to the button that opened the dialog.
+    const trigger = triggerRef.current;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setShowDelete(false);
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      triggerRef.current?.focus();
+      trigger?.focus();
     };
   }, [showDelete]);
 

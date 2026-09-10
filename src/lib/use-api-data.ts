@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type ApiErrorKind = "offline" | "unauthorized" | "notFound" | "server" | "network";
 
@@ -48,9 +48,10 @@ function classify(status: number | null): ApiError {
   };
 }
 
-interface State<T> {
+/** What a finished request left behind, tagged with the request it answered. */
+interface Settled<T> {
+  key: string | null;
   data: T | null;
-  loading: boolean;
   error: ApiError | null;
 }
 
@@ -60,56 +61,66 @@ interface State<T> {
  *
  * Replaces the `.catch(console.error)` pattern, which left `data` at its
  * initial value and made every failure render as an empty state.
+ *
+ * `loading` is derived, not stored: a request is in flight exactly when the
+ * last settled result does not belong to the current request key. That keeps
+ * the effect free of synchronous setState (no cascading render on mount) and
+ * makes a stale response impossible to display — it carries the wrong key.
  */
 export function useApiData<T>(url: string | null, deps: unknown[] = []) {
-  const [state, setState] = useState<State<T>>({
+  const [attempt, setAttempt] = useState(0);
+  const [settled, setSettled] = useState<Settled<T>>({
+    key: null,
     data: null,
-    loading: true,
     error: null,
   });
-  const reqId = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!url) {
-      setState({ data: null, loading: false, error: null });
-      return;
-    }
-    const id = ++reqId.current;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (id === reqId.current) {
-          setState({ data: null, loading: false, error: classify(res.status) });
-        }
-        return;
-      }
-      const json = (await res.json()) as T;
-      if (id === reqId.current) {
-        setState({ data: json, loading: false, error: null });
-      }
-    } catch {
-      if (id === reqId.current) {
-        setState({ data: null, loading: false, error: classify(null) });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  // Identity of the request the caller is currently asking for. Bumping
+  // `attempt` mints a new one, which is what makes retry re-fetch.
+  const key = url === null ? null : `${url} ${JSON.stringify(deps)} ${attempt}`;
 
   useEffect(() => {
-    load();
-    return () => {
-      // invalidate any in-flight response for this mount
-      reqId.current++;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, ...deps]);
+    if (url === null || key === null) return;
+    let cancelled = false;
 
-  const setData = useCallback((updater: (prev: T | null) => T | null) => {
-    setState((prev) => ({ ...prev, data: updater(prev.data) }));
+    void (async () => {
+      try {
+        const res = await fetch(url);
+        if (cancelled) return;
+        if (!res.ok) {
+          setSettled({ key, data: null, error: classify(res.status) });
+          return;
+        }
+        const json = (await res.json()) as T;
+        if (!cancelled) setSettled({ key, data: json, error: null });
+      } catch {
+        if (!cancelled) setSettled({ key, data: null, error: classify(null) });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url, key]);
+
+  const fresh = settled.key === key;
+  const loading = key !== null && !fresh;
+
+  const retry = useCallback(() => {
+    setAttempt((n) => n + 1);
   }, []);
 
-  return { ...state, retry: load, setData };
+  const setData = useCallback((updater: (prev: T | null) => T | null) => {
+    setSettled((prev) => ({ ...prev, data: updater(prev.data) }));
+  }, []);
+
+  return {
+    data: fresh ? settled.data : null,
+    loading,
+    error: fresh ? settled.error : null,
+    retry,
+    setData,
+  };
 }
 
 /**

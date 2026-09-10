@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { db, getUserByClerkId } from "@/lib/db";
+import { db } from "@/lib/db";
 import { Plus } from "lucide-react";
 import { PlanCard } from "@/components/plan-card";
 

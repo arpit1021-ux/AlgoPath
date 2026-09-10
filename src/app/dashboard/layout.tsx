@@ -82,7 +82,11 @@ export default function DashboardLayout({
     [planSlug]
   );
 
-  const NavContent = () => (
+  // A value, not a component defined during render: declaring a component
+  // inside another component gives it a new identity every render, so React
+  // unmounts and remounts the whole sidebar (losing focus and scroll) on any
+  // state change. Rendering the same element in both places costs nothing.
+  const navContent = (
     <>
       <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
         <Link href="/dashboard" className="flex items-center gap-2.5">
@@ -250,7 +254,7 @@ export default function DashboardLayout({
           borderRight: "1px solid var(--sidebar-border)",
         }}
       >
-        <NavContent />
+        {navContent}
       </aside>
 
       <div className={`lg:hidden fixed inset-0 z-[105] transition-opacity duration-300 ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}>
@@ -259,7 +263,7 @@ export default function DashboardLayout({
           className={`absolute left-0 top-0 bottom-0 w-[260px] flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
           style={{ background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }}
         >
-          <NavContent />
+          {navContent}
         </div>
       </div>
 

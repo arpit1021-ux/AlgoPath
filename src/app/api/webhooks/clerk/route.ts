@@ -20,7 +20,7 @@ async function handleWebhook(request: NextRequest) {
 
   try {
     evt = wh.verify(payload, headers) as { type: string; data: Record<string, unknown> };
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 

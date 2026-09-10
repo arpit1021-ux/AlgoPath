@@ -23,7 +23,6 @@ export async function calculateReadinessScore(
   }
 
   const allProblems = plan.problems;
-  const solvedProblems = allProblems.filter((p) => p.status === "SOLVED");
   const totalProblems = allProblems.length;
 
   if (totalProblems === 0) {

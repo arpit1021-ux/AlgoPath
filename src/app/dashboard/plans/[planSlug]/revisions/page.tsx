@@ -56,16 +56,20 @@ const REVISION_LABELS: Record<number, string> = {
 function RevisionCard({
   rev,
   isOverdue,
+  now,
   onComplete,
   completing,
 }: {
   rev: Revision;
   isOverdue: boolean;
+  /** Snapshot of the clock taken once by the page, so every card in a list
+      measures "days overdue" against the same instant. */
+  now: number;
   onComplete: (id: string) => void;
   completing: boolean;
 }) {
   const daysOverdue = isOverdue
-    ? Math.floor((Date.now() - new Date(rev.scheduledDate).getTime()) / 86400000)
+    ? Math.floor((now - new Date(rev.scheduledDate).getTime()) / 86400000)
     : 0;
 
   return (
@@ -138,7 +142,15 @@ function RevisionCard({
   );
 }
 
+/* One clock read per mount, handed to every card. Calling Date.now() inside
+   a card would be an impure render and could give two cards in the same list
+   different answers. */
+function nowMs() {
+  return Date.now();
+}
+
 export default function RevisionsPage() {
+  const [now] = useState(nowMs);
   const params = useParams();
   const planSlug = params.planSlug as string;
   const { data, loading, error, retry, setData } = useApiData<RevisionsResponse>(
@@ -287,6 +299,7 @@ export default function RevisionsPage() {
                 key={rev.id}
                 rev={rev}
                 isOverdue
+                now={now}
                 onComplete={completeRevision}
                 completing={completing.has(rev.id)}
               />
@@ -314,6 +327,7 @@ export default function RevisionsPage() {
                 key={rev.id}
                 rev={rev}
                 isOverdue={false}
+                now={now}
                 onComplete={completeRevision}
                 completing={completing.has(rev.id)}
               />

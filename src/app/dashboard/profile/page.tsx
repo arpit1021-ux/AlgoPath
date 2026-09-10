@@ -9,9 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { User, Trophy, Target, Flame, CheckCircle2, RotateCcw, Lock, Sword, Shield, Star, TrendingUp, Crown } from "lucide-react";
+import { User, Trophy, Target, Flame, CheckCircle2, RotateCcw, Lock, Sword, TrendingUp, Crown } from "lucide-react";
 import { ProgressBar } from "@/components/ui-custom";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +81,7 @@ export default async function ProfilePage() {
     })
   );
 
-  let checkDate = new Date(today);
+  const checkDate = new Date(today);
   while (true) {
     if (activityDates.has(checkDate.getTime())) {
       streak++;
@@ -143,6 +142,9 @@ export default async function ProfilePage() {
       {/* Hero section */}
       <div className="flex items-center gap-6 p-6 rounded-2xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
         {clerkUser?.imageUrl ? (
+          // Clerk serves avatars from a CDN host that would each need adding to
+          // next.config images.remotePatterns; a 80px avatar is not worth it.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={clerkUser.imageUrl}
             alt="Profile"
@@ -177,6 +179,7 @@ export default async function ProfilePage() {
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
             {clerkUser?.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={clerkUser.imageUrl}
                 alt="Avatar"

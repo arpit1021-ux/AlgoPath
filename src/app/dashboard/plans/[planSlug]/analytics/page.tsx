@@ -115,7 +115,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  const { readiness, weakTopics, difficultyCompletion, weeklyActivity } = analytics;
+  const { readiness, weakTopics, difficultyCompletion } = analytics;
 
   const difficultyData = Object.entries(difficultyCompletion).map(([key, val]) => ({
     name: key.charAt(0) + key.slice(1).toLowerCase(),
@@ -160,7 +160,7 @@ export default function AnalyticsPage() {
         <Card className="border-border/50" style={{ boxShadow: "var(--shadow-sm)" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Score Breakdown</CardTitle>
-            <CardDescription>What's driving your score</CardDescription>
+            <CardDescription>What&apos;s driving your score</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {READINESS_ITEMS.map(({ key, label, icon: Icon }) => {

@@ -236,23 +236,12 @@ export default function NewPlanPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  // Under ~1s an overlay just flickers and makes the action feel slower, so
-  // hold it back briefly and let fast responses show nothing at all.
-  const [showOverlay, setShowOverlay] = useState(false);
-
-  // Tied to `submitting` so every exit path — success, each error branch, the
-  // network catch — takes the overlay down without needing its own cleanup.
-  useEffect(() => {
-    if (!submitting) {
-      setShowOverlay(false);
-      return;
-    }
-    const t = setTimeout(() => setShowOverlay(true), 400);
-    return () => clearTimeout(t);
-  }, [submitting]);
+  // Under ~1s an overlay just flickers and makes the action feel slower, so it
+  // is held back for 400ms — by CSS (`.overlay-delayed`), not a timer. Tying
+  // it to `submitting` alone means every exit path takes it down: success,
+  // each error branch, the network catch, with no cleanup of its own.
   const [error, setError] = useState<string | null>(null);
   const [planCreated, setPlanCreated] = useState(false);
-  const [createdPlanId, setCreatedPlanId] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
 
   const [planName, setPlanName] = useState("");
@@ -419,7 +408,6 @@ export default function NewPlanPage() {
       const data = await res.json();
       setSubmitting(false);
       setPlanCreated(true);
-      setCreatedPlanId(data.plan.id);
       // Short enough to register, short enough not to feel like a second wait.
       setTimeout(() => router.push(`/dashboard/plans/${data.plan.id}`), 450);
     } catch {
@@ -1190,9 +1178,9 @@ export default function NewPlanPage() {
       </div>
 
       {/* STATE 1: Loading overlay */}
-      {showOverlay && (
+      {submitting && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-sm overlay-delayed"
           style={{ background: "rgba(0,0,0,0.85)" }}
         >
           <LoadingExperience difficulty={difficultyPreference} />
