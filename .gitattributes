@@ -1,0 +1,22 @@
+# Store everything with LF in the repository and check out LF everywhere.
+# Without this, a Windows working tree writes CRLF while commits hold LF, so
+# every file shows as fully rewritten and diffs become unreviewable. CRLF also
+# breaks shell scripts and entrypoints once they are copied into a Linux image.
+* text=auto eol=lf
+
+# Windows-only scripts genuinely need CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Never touch binaries.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.pdf  binary

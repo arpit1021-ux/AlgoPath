@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch cancels the run still in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    name: Typecheck, lint and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # The build never connects to a database, but Prisma's config asserts the
+      # variable is set, and Next inlines NEXT_PUBLIC_* at build time.
+      DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
+      CLERK_SECRET_KEY: "sk_test_placeholder"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` runs postinstall -> prisma generate, so the client exists
+      # before the typecheck reads its types.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src
+
+      - name: Build
+        run: npm run build
+
+      # The build output is what actually ships, so keep it on failed runs too.
+      - name: Upload build output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next/standalone
+          retention-days: 5
+          if-no-files-found: ignore
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only worth the minutes once the code itself is known good.
+    needs: verify
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Builds the image but does not push. Pushing to ECR is added in the
+      # deploy workflow once the AWS side exists.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_placeholder
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

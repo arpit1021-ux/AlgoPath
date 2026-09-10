@@ -9,6 +9,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Emit .next/standalone: a self-contained server with only the traced
+  // dependencies. Without it the Docker image has to carry all of node_modules.
+  output: "standalone",
   images: {
     remotePatterns: [
       {

@@ -1,0 +1,19 @@
+# Build context should carry source only — everything else is rebuilt or secret.
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.log
+.DS_Store
+Dockerfile
+docker-compose*.yml
+.dockerignore
+README.md
+docs
+_to_delete
+.freebuff
+tsconfig.tsbuildinfo
