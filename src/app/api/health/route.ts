@@ -12,6 +12,20 @@ export const runtime = "nodejs";
  * cannot reach Postgres is not ready to serve, and reporting it healthy just
  * routes traffic at a broken instance.
  */
+/**
+ * "live" or "test", read from the publishable key's prefix. The publishable
+ * key is public by design, so reporting which Clerk instance the running
+ * container is wired to leaks nothing -- and it answers the question that is
+ * otherwise only answerable by trying to sign in: did this deploy actually
+ * pick up the production keys, or is it still pointed at the dev instance?
+ */
+function clerkMode(): "live" | "test" | "unset" {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+  if (pk.startsWith("pk_live_")) return "live";
+  if (pk.startsWith("pk_test_")) return "test";
+  return "unset";
+}
+
 export async function GET() {
   const startedAt = Date.now();
 
@@ -21,6 +35,7 @@ export async function GET() {
       {
         status: "ok",
         database: "reachable",
+        clerk: clerkMode(),
         latencyMs: Date.now() - startedAt,
         uptimeSeconds: Math.round(process.uptime()),
         timestamp: new Date().toISOString(),
@@ -34,6 +49,7 @@ export async function GET() {
       {
         status: "degraded",
         database: "unreachable",
+        clerk: clerkMode(),
         latencyMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       },

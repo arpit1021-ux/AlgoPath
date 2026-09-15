@@ -1,6 +1,13 @@
 # Runs on the EC2 host. The database is RDS, not a container — a managed
 # Postgres gives you backups, patching and point-in-time restore, none of
 # which a container on the same box would survive losing.
+#
+# Secrets live in ONE file on the host: `.env`, copied from
+# .env.production.example. It has to be named `.env` because Compose only
+# interpolates ${VARS} in THIS file from `.env` (or --env-file) — `env_file:`
+# below feeds the container at runtime and does nothing for the build args.
+# Split them across two names and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is baked
+# into the image as an empty string, and the app 500s on every page.
 
 services:
   app:
@@ -11,7 +18,7 @@ services:
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     image: algopath:latest
     restart: unless-stopped
-    env_file: .env.production
+    env_file: .env
     expose:
       - "3000"
     healthcheck:
@@ -38,7 +45,10 @@ services:
       - ./nginx/certbot/www:/var/www/certbot:ro
     depends_on:
       app:
-        condition: service_healthy
+        # started, not healthy: the app's healthcheck queries the database, so
+        # a bad DATABASE_URL would keep nginx from ever starting and you would
+        # get a connection refused instead of a page telling you what broke.
+        condition: service_started
     logging:
       driver: json-file
       options:

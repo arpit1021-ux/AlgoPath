@@ -6,9 +6,27 @@ and nginx via Docker Compose. Roughly a weekend, most of it waiting for AWS.
 Region: **ap-south-1 (Mumbai)** — Neon in Singapore was costing ~4x the round
 trip from India, which is most of the latency in the current app.
 
-> Cost note: `db.t4g.micro` and `t4g.small` are free-tier eligible for 12 months
-> on a new account. Outside that, expect roughly $25–35/month for both.
-> **Set a billing alarm before you provision anything.**
+> ### Cost
+>
+> AWS changed the free tier in mid-2025. Which one you are on depends on when
+> your account was created, and it changes what this costs:
+>
+> - **Account created after ~July 2025** — you get **up to $200 in credits
+>   ($100 on signup, $100 more for using services), valid 6 months or until
+>   spent**, whichever comes first. There is no per-service free allowance;
+>   EC2 and RDS both draw down the credits. This stack runs roughly
+>   $25–35/month, so $200 covers about the full 6 months. After that you either
+>   stop the instances or start paying.
+> - **Older account still inside its 12 months** — the classic tier gives 750
+>   h/month of `t3.micro` EC2 and 750 h/month of `db.t4g.micro` RDS. Note
+>   `t4g.small` is **not** in it; its free trial ended in 2024.
+>
+> Check which you are on at Billing → Free tier in the console before you
+> provision anything.
+>
+> **A CloudWatch billing alarm is free** (10 alarms, always). Set one at $10
+> first — it is the only thing between a misconfigured instance and a surprise
+> bill, and it costs nothing.
 
 ---
 
@@ -59,7 +77,20 @@ do not want one.
 
 ## 3. EC2
 
-- **Ubuntu 24.04 LTS**, `t4g.small` (ARM). The image builds fine on ARM.
+- **Ubuntu 24.04 LTS**, `t4g.small` (ARM, 2 GB). The image builds fine on ARM.
+
+  On the classic 12-month tier `t4g.small` is not free — but the 1 GB
+  alternatives (`t3.micro`, `t4g.micro`) will **OOM during `next build`**
+  inside Docker. If you must use one, add swap before building:
+
+  ```bash
+  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+  sudo mkswap /swapfile && sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  ```
+
+  Swap makes the build succeed but slow. Building the image in CI and pulling
+  it is the better long-term answer.
 - Security group `algopath-web`
 - 20 GB gp3 root volume
 - Create a new key pair, download the `.pem`, keep it safe
@@ -117,20 +148,42 @@ an order the constraints reject.
 ```bash
 git clone https://github.com/<you>/AlgoPath.git
 cd AlgoPath
-cp .env.production.example .env.production
-nano .env.production          # RDS URL, Clerk *live* keys, Upstash, Inngest
+cp .env.production.example .env   # the name must be .env — see below
+nano .env                         # RDS URL, Clerk *live* keys, site URL
 
 docker compose up -d --build
 docker compose ps             # app should reach "healthy", not just "running"
-curl -f localhost/api/health  # {"status":"ok","database":"reachable",...}
+curl -f localhost/api/health  # {"status":"ok","database":"reachable","clerk":"live",...}
 ```
 
+**Why `.env` and not `.env.production`:** Compose interpolates the `${...}`
+build args in `docker-compose.yml` from a file literally named `.env`. The
+`env_file:` key is a different mechanism — it only populates the *running*
+container. Keep the secrets in `.env.production` and the build args resolve to
+empty strings, so the image is built with an empty Clerk publishable key and
+every page 500s with no obvious cause.
+
 If `app` never turns healthy, `docker compose logs app` first — it is almost
-always the database URL or a missing Clerk key.
+always the database URL or a missing Clerk key. nginx starts regardless (it
+waits for `service_started`, not `service_healthy`), so you will get a readable
+error page rather than a refused connection.
+
+`curl` reporting `"clerk":"test"` means the image was built against the dev
+Clerk instance — rebuild once `.env` has the live key.
 
 ---
 
-## 6. TLS
+## 6. TLS (needs a domain — skip this and section 7's Clerk step if you have none)
+
+Everything above works without a domain: the app is reachable at
+`http://<elastic-ip>` and you have a real deployment to show and to talk about.
+What you cannot do without one is HTTPS (Let's Encrypt will not issue a
+certificate for a bare IP) or Clerk production (it verifies CNAMEs you own).
+Neither of those makes the AWS work wasted — they are a clean second phase,
+and a `.xyz` or `.site` domain costs a few hundred rupees for the first year
+when you are ready.
+
+
 
 Point your domain's A record at the Elastic IP, wait for DNS, then:
 
@@ -147,11 +200,32 @@ Then `docker compose restart nginx`.
 
 ## 7. Post-deploy
 
-- **Clerk**: add the production domain, switch to live keys, and repoint the
-  webhook at `https://your-domain.com/api/webhooks/clerk`.
+- **Clerk**: start this *before* the deploy, not after — the DNS records take
+  time to propagate and nobody can sign in until they do. Full steps in
+  [CLERK-PRODUCTION.md](./CLERK-PRODUCTION.md).
 - **Billing alarm**: CloudWatch, $10 threshold. Do this now, not later.
 - **Updates**: `git pull && docker compose up -d --build`
 - **Rollback**: `git checkout <last-good-sha> && docker compose up -d --build`
+
+---
+
+## Known loose end: Inngest
+
+`src/app/api/inngest/route.ts` registers two background functions —
+`sync-leetcode-problems` and `generate-ai-notes` — but **nothing in `src/`
+ever calls `inngest.send()`**, so neither has ever run. The AI-notes one also
+calls OpenAI with an `OPENAI_API_KEY` that no env example documented until now.
+
+Nothing breaks by deploying as-is; the route just serves a function list to a
+service that never sends it an event. But it is dead weight in the dependency
+list, and a reviewer reading the repo will find it. Two honest ways out:
+
+- **Remove it** — drop `inngest` from `package.json`, delete
+  `src/lib/inngest.ts`, `src/app/api/inngest/route.ts`, the middleware public
+  route, and the three env vars. Smallest surface, one less thing to explain.
+- **Wire it up** — emit `sync/problems.requested` on a schedule and
+  `notes/generate.requested` from a button in the roadmap UI. More work, but
+  then the background-jobs story on your resume is a real one.
 
 ---
 

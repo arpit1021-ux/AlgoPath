@@ -249,9 +249,14 @@ section { position: relative; }
   .mockup-card { max-width: 100% !important; margin: 0 !important; }
 }
 
-.clerk-dev-banner, [class*="cl-configure"], .cl-portalPopover, [data-clerk-id] > div:last-child, #clerk-dev-browser, .clerk-dev-browser { display: none !important; }
-[style*="position: fixed"][style*="bottom"][style*="right"] { pointer-events: none; }
-[style*="position: fixed"][style*="bottom"][style*="right"] > div { pointer-events: auto; }
+/* Clerk's development-mode badge used to be hidden here with a set of
+   attribute selectors. A production Clerk instance never renders it, so the
+   rules were dead weight -- and dangerous ones: `.cl-portalPopover` is the
+   UserButton's own dropdown, and the `position: fixed` + bottom + right pair
+   killed pointer events on *any* element parked in that corner, which would
+   silently break the next toast or floating button put there.
+   "Secured by Clerk" is removed properly instead, via
+   `appearance.elements.footer` in src/lib/clerk-appearance.ts. */
 
 @keyframes scale-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes fill-bar { from { width: 0%; } to { width: 100%; } }
